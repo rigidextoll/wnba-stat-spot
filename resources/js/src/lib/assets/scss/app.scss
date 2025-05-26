@@ -1,0 +1,117 @@
+//
+// app.scss
+//
+
+// Core files - Import Bootstrap functions and mixins first
+@import 'bootstrap/scss/functions';
+@import 'bootstrap/scss/variables';
+@import 'bootstrap/scss/mixins';
+
+// Then import custom variables that may use Bootstrap mixins
+@import 'config/variables';
+@import 'config/variables-dark';
+@import 'config/variables-custom';
+@import 'config/theme-mode';
+
+// Import the rest of Bootstrap
+@import 'bootstrap/scss/utilities';
+@import 'bootstrap/scss/root';
+@import 'bootstrap/scss/reboot';
+@import 'bootstrap/scss/type';
+@import 'bootstrap/scss/images';
+@import 'bootstrap/scss/containers';
+@import 'bootstrap/scss/grid';
+@import 'bootstrap/scss/tables';
+@import 'bootstrap/scss/forms';
+@import 'bootstrap/scss/buttons';
+@import 'bootstrap/scss/transitions';
+@import 'bootstrap/scss/dropdown';
+@import 'bootstrap/scss/button-group';
+@import 'bootstrap/scss/nav';
+@import 'bootstrap/scss/navbar';
+@import 'bootstrap/scss/card';
+@import 'bootstrap/scss/accordion';
+@import 'bootstrap/scss/breadcrumb';
+@import 'bootstrap/scss/pagination';
+@import 'bootstrap/scss/badge';
+@import 'bootstrap/scss/alert';
+@import 'bootstrap/scss/progress';
+@import 'bootstrap/scss/list-group';
+@import 'bootstrap/scss/close';
+@import 'bootstrap/scss/toasts';
+@import 'bootstrap/scss/modal';
+@import 'bootstrap/scss/tooltip';
+@import 'bootstrap/scss/popover';
+@import 'bootstrap/scss/carousel';
+@import 'bootstrap/scss/spinners';
+@import 'bootstrap/scss/offcanvas';
+@import 'bootstrap/scss/placeholders';
+@import 'bootstrap/scss/helpers';
+@import 'bootstrap/scss/utilities/api';
+
+// Structure
+@import 'structure/topbar';
+@import 'structure/vertical';
+@import 'structure/page-title';
+@import 'structure/footer';
+
+// Bootstrap
+@import 'components/accordion';
+@import 'components/alerts';
+@import 'components/avatar';
+@import 'components/backgrounds';
+@import 'components/badge';
+@import 'components/breadcrumb';
+@import 'components/buttons';
+@import 'components/card';
+@import 'components/docs';
+@import 'components/dropdown';
+@import 'components/forms';
+@import 'components/helper';
+@import 'components/list-group';
+@import 'components/modal';
+@import 'components/nav';
+@import 'components/pagination';
+@import 'components/popover';
+@import 'components/print';
+@import 'components/progress';
+@import 'components/reboot';
+@import 'components/switch';
+@import 'components/tables';
+@import 'components/type';
+@import 'components/tooltip';
+@import 'components/widgets';
+
+// Plugin
+@import 'plugins/simplebar';
+@import 'plugins/calendar';
+@import 'plugins/choice';
+@import 'plugins/dropzone';
+@import 'plugins/editors';
+@import 'plugins/gridjs';
+@import 'plugins/apexcharts';
+@import 'plugins/google-map';
+@import 'plugins/vector-map';
+@import 'plugins/dragula';
+@import 'plugins/flatpicker';
+@import 'plugins/swiper';
+@import 'plugins/sweetalert';
+@import 'plugins/prismjs';
+@import 'plugins/range-slider';
+@import 'plugins/toastify';
+
+// App Page
+@import 'pages/app-chat';
+@import 'pages/app-file-manager';
+@import 'pages/app-email';
+@import 'pages/app-ecommerce';
+@import 'pages/app-social';
+
+// Pages
+@import 'pages/icon-demo';
+@import 'pages/authentication';
+@import 'pages/pricing';
+@import 'pages/timeline';
+
+// Custom
+@import "custom/svelte";
