@@ -36,6 +36,9 @@ RUN apk add --no-cache \
     php82-xmlwriter \
     php82-simplexml \
     php82-phar \
+    php82-iconv \
+    php82-intl \
+    php82-posix \
     git \
     curl \
     zip \
