@@ -65,6 +65,10 @@ WORKDIR /var/www/html
 # Copy application code first (needed for artisan)
 COPY . .
 
+# Create Laravel directories if they don't exist
+RUN mkdir -p storage/logs storage/framework/cache storage/framework/sessions storage/framework/views \
+    && mkdir -p bootstrap/cache
+
 # Set PHP memory limit for Composer
 ENV COMPOSER_MEMORY_LIMIT=-1
 
@@ -85,8 +89,8 @@ RUN npm ci --only=production
 # Back to main directory
 WORKDIR /var/www/html
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
+# Set permissions (use nginx user which already exists)
+RUN chown -R nginx:nginx /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
