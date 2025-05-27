@@ -26,6 +26,29 @@ if [ -d "/var/www/html/frontend-build" ]; then
         echo "✅ SvelteKit index.js found"
     else
         echo "❌ SvelteKit index.js not found"
+    fi
+
+    # Check for client assets
+    if [ -d "/var/www/html/frontend-build/client" ]; then
+        echo "✅ SvelteKit client directory exists"
+        ls -la /var/www/html/frontend-build/client/
+
+        if [ -d "/var/www/html/frontend-build/client/_app" ]; then
+            echo "✅ SvelteKit _app directory exists"
+            ls -la /var/www/html/frontend-build/client/_app/ | head -10
+        else
+            echo "❌ SvelteKit _app directory not found"
+        fi
+
+        if [ -d "/var/www/html/frontend-build/client/immutable" ]; then
+            echo "✅ SvelteKit immutable directory exists"
+            ls -la /var/www/html/frontend-build/client/immutable/ | head -10
+        else
+            echo "❌ SvelteKit immutable directory not found"
+        fi
+    else
+        echo "❌ SvelteKit client directory not found"
+        echo "Available directories:"
         ls -la /var/www/html/frontend-build/
     fi
 else
