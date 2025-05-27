@@ -11,12 +11,21 @@ const API_URLS = {
 
 // Get API URL from environment variables with fallbacks
 const getApiUrl = () => {
-    // In production, use environment variable
+    // In production, use environment variable if set
     if (env.PUBLIC_API_URL) {
         return env.PUBLIC_API_URL;
     }
 
-    // Use localhost for browser (host machine) and service name for server-side (container)
+    // If we're in the browser and the current URL is not localhost, use relative URLs
+    if (browser && typeof window !== 'undefined') {
+        const currentHost = window.location.host;
+        if (!currentHost.includes('localhost') && !currentHost.includes('127.0.0.1')) {
+            // Production deployment - use relative URL
+            return '/api';
+        }
+    }
+
+    // Development mode - use localhost for browser (host machine) and service name for server-side (container)
     return browser ? API_URLS.localhost : API_URLS.service;
 };
 
@@ -29,7 +38,9 @@ if (typeof window !== 'undefined') {
         selectedURL: API_URL,
         envApiUrl: env.PUBLIC_API_URL,
         currentURL: window.location.href,
+        currentHost: window.location.host,
         environment: env.PUBLIC_API_URL ? 'production' : 'development',
+        isProduction: !window.location.host.includes('localhost'),
         containerMode: 'docker-compose',
         userAgent: navigator.userAgent
     });
