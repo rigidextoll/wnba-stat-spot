@@ -260,6 +260,32 @@ fi
 # Function to wait for database with timeout (run in background)
 wait_for_database() {
     echo "⏳ Waiting for database connection..."
+
+    # Check if database environment variables are set
+    echo "🔍 Checking database environment variables..."
+    if [ -z "$DB_HOST" ] || [ "$DB_HOST" = "127.0.0.1" ]; then
+        echo "⚠️  DB_HOST not set or defaulting to localhost"
+        echo "🔧 Checking for Render database auto-population..."
+
+        # List all environment variables that might be database-related
+        echo "📋 Available environment variables:"
+        env | grep -E "(DB_|DATABASE|POSTGRES|RENDER)" | sort || echo "No database-related env vars found"
+
+        # If auto-population failed, we might need manual configuration
+        if [ -z "$DB_HOST" ] || [ "$DB_HOST" = "127.0.0.1" ]; then
+            echo "❌ Database environment variables not properly set"
+            echo "🔧 Please check your Render database service configuration"
+            echo "   Expected: DB_HOST should be your Render database hostname"
+            echo "   Current: DB_HOST=${DB_HOST:-'NOT SET'}"
+        fi
+    else
+        echo "✅ Database environment variables appear to be set"
+        echo "   DB_HOST: $DB_HOST"
+        echo "   DB_PORT: ${DB_PORT:-'NOT SET'}"
+        echo "   DB_DATABASE: ${DB_DATABASE:-'NOT SET'}"
+        echo "   DB_USERNAME: ${DB_USERNAME:-'NOT SET'}"
+    fi
+
     local max_attempts=30
     local attempt=1
 
@@ -267,16 +293,16 @@ wait_for_database() {
         if php artisan migrate:status > /dev/null 2>&1; then
             echo "✅ Database connection established"
 
+            # Debug environment variables
+            echo "🔍 Debugging environment configuration..."
+            php artisan debug:environment || echo "⚠️  Debug command failed, continuing..."
+
             # Run database migrations first
             echo "📊 Running database migrations..."
             php artisan migrate --force || echo "⚠️  Migrations failed, continuing..."
 
-            # Create queue tables if they don't exist
-            echo "📋 Setting up queue tables..."
-            php artisan queue:table --force 2>/dev/null || echo "Queue table migration already exists"
-            php artisan queue:failed-table --force 2>/dev/null || echo "Failed jobs table migration already exists"
-            php artisan queue:batches-table --force 2>/dev/null || echo "Job batches table migration already exists"
-            php artisan migrate --force || echo "⚠️  Queue table migrations failed, continuing..."
+            # Queue tables are created by the existing migration file
+            echo "📋 Queue tables will be created by migrations..."
 
             # Laravel optimizations (with error handling)
             echo "⚡ Optimizing Laravel application..."
@@ -293,12 +319,35 @@ wait_for_database() {
         fi
 
         echo "Database not ready, waiting... (attempt $attempt/$max_attempts)"
+
+        # Show more detailed error on later attempts
+        if [ $attempt -gt 10 ]; then
+            echo "🔍 Debugging database connection issue..."
+            echo "   DB_HOST: ${DB_HOST:-'NOT SET'}"
+            echo "   DB_PORT: ${DB_PORT:-'NOT SET'}"
+            echo "   DB_DATABASE: ${DB_DATABASE:-'NOT SET'}"
+            echo "   DB_USERNAME: ${DB_USERNAME:-'NOT SET'}"
+
+            # Try to test the connection more specifically
+            if command -v psql > /dev/null; then
+                echo "🔍 Testing PostgreSQL connection directly..."
+                PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_DATABASE" -c "SELECT 1;" 2>&1 || echo "Direct PostgreSQL connection failed"
+            fi
+        fi
+
         sleep 2
         attempt=$((attempt + 1))
     done
 
-    echo "⚠️  Database connection timeout after $max_attempts attempts"
+    echo "❌ Database connection timeout after $max_attempts attempts"
     echo "🔄 Application will continue running without database features..."
+    echo ""
+    echo "🚨 TROUBLESHOOTING STEPS:"
+    echo "1. Check that your Render database service is running"
+    echo "2. Verify database environment variables are set correctly"
+    echo "3. Ensure database service name matches render.yaml configuration"
+    echo "4. Check RENDER_DATABASE_TROUBLESHOOTING.md for detailed help"
+    echo ""
     return 1
 }
 

@@ -15,25 +15,15 @@ services:
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
-        fromDatabase:
-          name: wnba_stat_spot
-          property: host
+        value: dpg-d0r0621r0fns73fqmu70-a.oregon-postgres.render.com
       - key: DB_PORT
-        fromDatabase:
-          name: wnba_stat_spot
-          property: port
+        value: "5432"
       - key: DB_DATABASE
-        fromDatabase:
-          name: wnba_stat_spot
-          property: database
+        value: wnba_stat_spot
       - key: DB_USERNAME
-        fromDatabase:
-          name: wnba_stat_spot
-          property: user
+        value: wnba_user
       - key: DB_PASSWORD
-        fromDatabase:
-          name: wnba_stat_spot
-          property: password
+        sync: false  # You'll need to set this manually in the Render dashboard
       - key: CACHE_DRIVER
         value: database
       - key: QUEUE_CONNECTION
