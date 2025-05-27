@@ -168,7 +168,7 @@ class FixDatabaseConfig extends Command
         $this->info('🚀 Next Steps:');
         $this->line('  1. Ensure all environment variables are set in Render');
         $this->line('  2. Redeploy your application');
-        $this->line('  3. Run: php artisan queue:health-check --verbose');
+        $this->line('  3. Run: php artisan queue:health-check --detailed');
         $this->line('  4. Check queue worker logs: tail -f /tmp/laravel-queue.log');
 
         if ($this->option('force')) {

@@ -16,7 +16,7 @@ This guide will help you diagnose and fix the issue.
 ### 1. Check Queue Health
 ```bash
 # In your deployed container
-php artisan queue:health-check --verbose
+php artisan queue:health-check --detailed
 ```
 
 ### 2. Monitor Queue Status
@@ -53,7 +53,7 @@ Database file at path [/var/www/html/database/database.sqlite] does not exist
 php artisan db:fix-config --force
 
 # Or manually check configuration
-php artisan queue:health-check --verbose
+php artisan queue:health-check --detailed
 ```
 
 **What was fixed:**
@@ -128,7 +128,7 @@ php artisan migrate --force
 php artisan queue:health-check
 
 # Detailed health check
-php artisan queue:health-check --verbose
+php artisan queue:health-check --detailed
 
 # Fix database configuration issues
 php artisan db:fix-config --force

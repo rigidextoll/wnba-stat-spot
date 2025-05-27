@@ -136,7 +136,7 @@ Run these diagnostic commands in your deployed container:
 php artisan db:fix-config --verbose
 
 # Check queue health
-php artisan queue:health-check --verbose
+php artisan queue:health-check --detailed
 
 # Monitor queue worker logs
 tail -f /tmp/laravel-queue.log

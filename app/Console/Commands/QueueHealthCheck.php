@@ -14,7 +14,7 @@ class QueueHealthCheck extends Command
      *
      * @var string
      */
-    protected $signature = 'queue:health-check {--verbose : Show detailed information}';
+    protected $signature = 'queue:health-check {--detailed : Show detailed information}';
 
     /**
      * The console command description.
@@ -75,7 +75,7 @@ class QueueHealthCheck extends Command
             DB::connection()->getPdo();
             $this->line('  ✅ Database connection: OK');
 
-            if ($this->option('verbose')) {
+            if ($this->option('detailed')) {
                 $driver = config('database.connections.' . $defaultConnection . '.driver');
                 $this->line("    Driver: {$driver}");
 
@@ -124,7 +124,7 @@ class QueueHealthCheck extends Command
                 if (Schema::hasTable($table)) {
                     $this->line("  ✅ Table '{$table}': EXISTS");
 
-                    if ($this->option('verbose')) {
+                    if ($this->option('detailed')) {
                         $count = DB::table($table)->count();
                         $this->line("    Records: {$count}");
                     }
@@ -152,7 +152,7 @@ class QueueHealthCheck extends Command
             $driver = config("queue.connections.{$connection}.driver");
             $this->line("  ✅ Driver: {$driver}");
 
-            if ($this->option('verbose')) {
+            if ($this->option('detailed')) {
                 $this->line('    Configuration:');
                 $config = config("queue.connections.{$connection}");
                 foreach ($config as $key => $value) {
@@ -178,7 +178,7 @@ class QueueHealthCheck extends Command
             $pendingJobs = DB::table('jobs')->count();
             $this->line("  ✅ Pending jobs: {$pendingJobs}");
 
-            if ($this->option('verbose') && $pendingJobs > 0) {
+            if ($this->option('detailed') && $pendingJobs > 0) {
                 $recentJobs = DB::table('jobs')
                     ->select('queue', 'attempts', 'created_at')
                     ->orderBy('created_at', 'desc')
@@ -211,7 +211,7 @@ class QueueHealthCheck extends Command
             $failedJobs = DB::table('failed_jobs')->count();
             $this->line("  ✅ Failed jobs: {$failedJobs}");
 
-            if ($this->option('verbose') && $failedJobs > 0) {
+            if ($this->option('detailed') && $failedJobs > 0) {
                 $recentFailures = DB::table('failed_jobs')
                     ->select('queue', 'exception', 'failed_at')
                     ->orderBy('failed_at', 'desc')
