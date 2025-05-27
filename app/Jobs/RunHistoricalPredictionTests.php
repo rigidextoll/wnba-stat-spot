@@ -18,8 +18,10 @@ class RunHistoricalPredictionTests implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 3600; // 1 hour timeout
-    public $tries = 3;
+    public $timeout = 1800; // 30 minute timeout (reduced from 1 hour)
+    public $tries = 2; // Reduced from 3 to prevent excessive retries
+    public $maxExceptions = 3; // Allow some exceptions before failing
+    public $backoff = [60, 300]; // Backoff delays: 1 min, 5 min
 
     protected $testBatchId;
     protected $statTypes;
@@ -48,12 +50,17 @@ class RunHistoricalPredictionTests implements ShouldQueue
      */
     public function handle(): void
     {
+        // Set memory limit
+        ini_set('memory_limit', '1024M');
+
         Log::info('Starting historical prediction tests', [
             'batch_id' => $this->testBatchId,
             'stat_types' => $this->statTypes,
             'min_games' => $this->minGames,
             'test_games' => $this->testGames,
-            'player_limit' => $this->playerLimit
+            'player_limit' => $this->playerLimit,
+            'memory_limit' => ini_get('memory_limit'),
+            'max_execution_time' => ini_get('max_execution_time')
         ]);
 
         try {
@@ -113,6 +120,19 @@ class RunHistoricalPredictionTests implements ShouldQueue
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('Historical prediction tests job failed permanently', [
+            'batch_id' => $this->testBatchId,
+            'error' => $exception->getMessage(),
+            'attempts' => $this->attempts(),
+            'trace' => $exception->getTraceAsString()
+        ]);
     }
 
     /**

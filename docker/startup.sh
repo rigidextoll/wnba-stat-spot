@@ -195,6 +195,16 @@ wait_for_database() {
 # Run database setup in background
 wait_for_database &
 
+# Give database setup some time before starting queue health check
+sleep 10
+
+# Run queue health check in background
+(
+    sleep 30  # Wait a bit more for everything to settle
+    echo "🔍 Running queue health check..."
+    php artisan queue:health-check --verbose || echo "⚠️  Queue health check failed, but continuing..."
+) &
+
 echo "🎉 WNBA Stat Spot web services are ready!"
 echo "🌐 Application is listening on port ${PORT:-80}"
 
