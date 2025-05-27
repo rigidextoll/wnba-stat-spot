@@ -20,75 +20,66 @@
 
 1. **Go to [render.com](https://render.com) and sign up/login**
 
-2. **Create a new Web Service:**
+2. **Create PostgreSQL Database FIRST:**
+   - Click "New +" → "PostgreSQL"
+   - **Name:** `wnba-database`
+   - **Database Name:** `wnba_stat_spot`
+   - **User:** `wnba_user`
+   - Click "Create Database"
+   - **Wait for database to be fully ready before proceeding**
+
+3. **Create a new Web Service:**
    - Click "New +" → "Web Service"
    - Connect your GitHub account
    - Select your `wnba-stat-spot` repository
    - Click "Connect"
 
-3. **Configure the service:**
+4. **Configure the service:**
    - **Name:** `wnba-stat-spot`
    - **Runtime:** `Docker`
    - **Region:** `Oregon (US West)` or `Ohio (US East)`
    - **Branch:** `main`
    - **Dockerfile Path:** `./Dockerfile`
 
-4. **Add Environment Variables:**
+5. **Environment Variables (Auto-configured via render.yaml):**
+   The `render.yaml` file automatically configures all necessary environment variables including:
    ```
+   PORT=80
    APP_ENV=production
    APP_DEBUG=false
-   APP_KEY=base64:GENERATE_THIS_IN_RENDER
+   APP_KEY=[auto-generated]
    DB_CONNECTION=pgsql
-   CACHE_DRIVER=database
-   QUEUE_CONNECTION=database
-   SESSION_DRIVER=database
+   DB_HOST=[auto-linked from database]
+   DB_PORT=[auto-linked from database]
+   DB_DATABASE=[auto-linked from database]
+   DB_USERNAME=[auto-linked from database]
+   DB_PASSWORD=[auto-linked from database]
    ```
 
-5. **Create PostgreSQL Database:**
-   - Click "New +" → "PostgreSQL"
-   - **Name:** `wnba-database`
-   - **Database Name:** `wnba_stat_spot`
-   - **User:** `wnba_user`
-   - Click "Create Database"
-
-6. **Connect Database to Web Service:**
-   - Go back to your web service
-   - In Environment Variables, add:
-   ```
-   DB_HOST=[Internal Database URL from Render]
-   DB_PORT=5432
-   DB_DATABASE=wnba_stat_spot
-   DB_USERNAME=wnba_user
-   DB_PASSWORD=[Database Password from Render]
-   ```
-
-7. **Deploy:**
+6. **Deploy:**
    - Click "Create Web Service"
+   - Render will use the `render.yaml` configuration automatically
    - Wait for deployment (5-10 minutes)
    - Your app will be available at: `https://wnba-stat-spot.onrender.com`
 
-## Step 3: Generate APP_KEY
+## Step 3: Verify Deployment
 
-1. **After first deployment, go to your service logs**
-2. **Find the shell access or use Render's console**
-3. **Run:** `php artisan key:generate --show`
-4. **Copy the generated key and update the `APP_KEY` environment variable**
+1. **Check Health Endpoint:**
+   - Visit: `https://wnba-stat-spot.onrender.com/health`
+   - Should return: `{"status":"ok","timestamp":"...","app":"WNBA Stat Spot","version":"1.0.0"}`
 
-## Step 4: Run Migrations
-
-1. **In Render console or logs, run:**
-   ```bash
-   php artisan migrate --force
-   ```
-
-## Step 5: Import WNBA Data
-
-1. **Run the data import command:**
-   ```bash
-   php artisan app:import-wnba-data
-   ```
+2. **Check Application:**
+   - Visit: `https://wnba-stat-spot.onrender.com`
+   - Verify the dashboard loads properly
 
 ## 🎉 Your app is now live!
+
+### Deployment Improvements:
+- ✅ **Fixed port binding issues** - App now properly binds to Render's assigned port
+- ✅ **Improved database connection handling** - 60-second timeout with graceful fallback
+- ✅ **Better error handling** - Application starts even if some steps fail
+- ✅ **Health check endpoint** - Easy deployment verification
+- ✅ **Automatic configuration** - render.yaml handles all environment variables
 
 ### Free Tier Limits:
 - ✅ **750 hours/month** (enough for 24/7)
@@ -107,7 +98,46 @@
 - 📱 **Responsive Design**
 
 ### Troubleshooting:
-- **Build fails?** Check Dockerfile and dependencies
-- **Database connection issues?** Verify environment variables
-- **App crashes?** Check logs in Render dashboard
-- **Need help?** Check the deployment documentation files 
+
+#### Database Connection Issues:
+- **Symptom:** "Database not ready, waiting..." loops
+- **Solution:** Ensure database is created and running before web service
+- **New Fix:** Startup script now has 60-second timeout and continues even if database isn't ready
+
+#### Port Binding Issues:
+- **Symptom:** "No open ports detected"
+- **Solution:** Added `PORT=80` environment variable and dynamic nginx configuration
+- **New Fix:** Nginx configuration is now processed at startup to use correct port
+
+#### Build Issues:
+- Check the build logs in Render dashboard
+- Ensure all dependencies are properly specified
+- The Dockerfile handles both PHP/Laravel backend and Node.js/SvelteKit frontend
+
+#### Application Startup:
+The startup script now handles:
+- ✅ Dynamic nginx port configuration
+- ✅ Database connection with timeout
+- ✅ Laravel optimizations with error handling
+- ✅ WNBA data import (only if database available)
+- ✅ Service startup (nginx, php-fpm, SvelteKit, queue worker)
+
+### Manual Debugging:
+If you need to check logs or run commands:
+1. Go to Render dashboard
+2. Select your service
+3. Click "Shell" tab
+4. Run diagnostic commands:
+   ```bash
+   # Check if services are running
+   ps aux
+   
+   # Check nginx configuration
+   nginx -t
+   
+   # Check database connection
+   php artisan migrate:status
+   
+   # Check application health
+   curl localhost:80/health
+   ```

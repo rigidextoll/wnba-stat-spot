@@ -103,7 +103,10 @@ COPY docker/startup.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh \
     && ls -la /usr/local/bin/start.sh
 
-EXPOSE 80
+# Set default port (can be overridden by environment)
+ENV PORT=80
+
+EXPOSE $PORT
 
 # Use exec form to avoid shell interpretation issues
 CMD ["/usr/local/bin/start.sh"]
