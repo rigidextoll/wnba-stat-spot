@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 echo "🚀 Starting WNBA Stat Spot application..."
 

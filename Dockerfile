@@ -94,16 +94,16 @@ RUN chown -R nginx:nginx /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
-# Copy nginx configuration
+# Copy configuration files
 COPY docker/nginx.conf /etc/nginx/nginx.conf
-
-# Copy supervisor configuration
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Copy startup script
+# Copy and set up startup script
 COPY docker/startup.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh \
+    && ls -la /usr/local/bin/start.sh
 
 EXPOSE 80
 
+# Use exec form to avoid shell interpretation issues
 CMD ["/usr/local/bin/start.sh"]
