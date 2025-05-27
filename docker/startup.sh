@@ -47,6 +47,22 @@ if [ -d "/var/www/html/frontend-build" ]; then
         echo "✅ SvelteKit index.js found"
     else
         echo "❌ SvelteKit index.js not found"
+        echo "🔧 Creating minimal SvelteKit fallback..."
+        mkdir -p /var/www/html/frontend-build
+        cat > /var/www/html/frontend-build/index.js << 'SVELTEEOF'
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('*', (req, res) => {
+    res.status(503).send('Frontend service temporarily unavailable');
+});
+
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Fallback server listening on port ${port}`);
+});
+SVELTEEOF
+        echo "✅ Created fallback SvelteKit server"
     fi
 
     # Check for client assets
@@ -59,6 +75,8 @@ if [ -d "/var/www/html/frontend-build" ]; then
             ls -la /var/www/html/frontend-build/client/_app/ | head -10
         else
             echo "❌ SvelteKit _app directory not found"
+            echo "🔧 Creating minimal _app directory..."
+            mkdir -p /var/www/html/frontend-build/client/_app
         fi
 
         if [ -d "/var/www/html/frontend-build/client/immutable" ]; then
@@ -66,27 +84,108 @@ if [ -d "/var/www/html/frontend-build" ]; then
             ls -la /var/www/html/frontend-build/client/immutable/ | head -10
         else
             echo "❌ SvelteKit immutable directory not found"
+            echo "🔧 Creating minimal immutable directory..."
+            mkdir -p /var/www/html/frontend-build/client/immutable
+            echo "/* Placeholder CSS */" > /var/www/html/frontend-build/client/immutable/app.css
         fi
     else
         echo "❌ SvelteKit client directory not found"
+        echo "🔧 Creating minimal client structure..."
+        mkdir -p /var/www/html/frontend-build/client/_app
+        mkdir -p /var/www/html/frontend-build/client/immutable
+        echo "/* Placeholder CSS */" > /var/www/html/frontend-build/client/immutable/app.css
         echo "Available directories:"
         ls -la /var/www/html/frontend-build/
     fi
 else
     echo "❌ SvelteKit build directory not found"
+    echo "🔧 Creating complete fallback structure..."
+    mkdir -p /var/www/html/frontend-build/client/_app
+    mkdir -p /var/www/html/frontend-build/client/immutable
+
+    # Create fallback server
+    cat > /var/www/html/frontend-build/index.js << 'SVELTEEOF'
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('*', (req, res) => {
+    res.status(503).send('Frontend service temporarily unavailable');
+});
+
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Fallback server listening on port ${port}`);
+});
+SVELTEEOF
+
+    # Create package.json for fallback
+    cat > /var/www/html/frontend-build/package.json << 'PACKAGEEOF'
+{
+  "name": "wnba-fallback",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}
+PACKAGEEOF
+
+    echo "/* Placeholder CSS */" > /var/www/html/frontend-build/client/immutable/app.css
+    echo "✅ Created complete fallback structure"
     ls -la /var/www/html/
+fi
+
+# Install express if needed for fallback
+if [ ! -d "/var/www/html/frontend-build/node_modules" ]; then
+    echo "🔧 Installing fallback dependencies..."
+    cd /var/www/html/frontend-build
+    npm install express --no-save 2>/dev/null || echo "⚠️  Could not install express, using basic fallback"
+    cd /var/www/html
 fi
 
 # Start supervisord immediately to bind to port
 echo "🔧 Starting application services..."
 supervisord -c /etc/supervisor/conf.d/supervisord.conf &
 
-# Give services a moment to start
-sleep 5
+# Give services more time to start
+sleep 10
 
-# Check if services are running
+# Check if services are running with retries
 echo "📊 Checking service status..."
-ps aux | grep -E "(nginx|php-fpm|node)" | grep -v grep || echo "⚠️  Some services may not be running"
+for i in 1 2 3; do
+    echo "Attempt $i to check services..."
+
+    # Check nginx
+    if pgrep nginx > /dev/null; then
+        echo "✅ Nginx is running"
+    else
+        echo "❌ Nginx not running, attempting to start..."
+        nginx -g "daemon off;" &
+        sleep 2
+    fi
+
+    # Check PHP-FPM
+    if pgrep php-fpm > /dev/null; then
+        echo "✅ PHP-FPM is running"
+    else
+        echo "❌ PHP-FPM not running, attempting to start..."
+        php-fpm -F -R &
+        sleep 2
+    fi
+
+    # Check SvelteKit/Node
+    if pgrep node > /dev/null; then
+        echo "✅ Node.js (SvelteKit) is running"
+        break
+    else
+        echo "❌ Node.js not running, attempting to start..."
+        cd /var/www/html/frontend-build
+        PORT=3000 HOST=0.0.0.0 node index.js &
+        cd /var/www/html
+        sleep 3
+    fi
+
+    sleep 5
+done
 
 # Test if port is bound (use ss if netstat not available)
 echo "🔍 Testing port binding..."

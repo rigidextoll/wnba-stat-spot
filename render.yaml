@@ -16,23 +16,23 @@ services:
         value: pgsql
       - key: DB_HOST
         fromDatabase:
-          name: wnba_database
+          name: wnba_stat_spot
           property: host
       - key: DB_PORT
         fromDatabase:
-          name: wnba_database
+          name: wnba_stat_spot
           property: port
       - key: DB_DATABASE
         fromDatabase:
-          name: wnba_database
+          name: wnba_stat_spot
           property: database
       - key: DB_USERNAME
         fromDatabase:
-          name: wnba_database
+          name: wnba_stat_spot
           property: user
       - key: DB_PASSWORD
         fromDatabase:
-          name: wnba_database
+          name: wnba_stat_spot
           property: password
       - key: CACHE_DRIVER
         value: database
@@ -188,6 +188,6 @@ services:
         value: "10"
 
 databases:
-  - name: wnba_database
+  - name: wnba_stat_spot
     databaseName: wnba_stat_spot
     user: wnba_user

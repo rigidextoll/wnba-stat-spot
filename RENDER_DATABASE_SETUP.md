@@ -14,7 +14,7 @@ Your application is trying to connect to PostgreSQL but getting "Connection refu
 
 2. **Configure Database Settings**
    ```
-   Name: wnba_database
+   Name: wnba_stat_spot
    Database: wnba_stat_spot
    User: wnba_user
    Region: Same as your web service (recommended)
@@ -23,7 +23,7 @@ Your application is trying to connect to PostgreSQL but getting "Connection refu
    ```
 
 3. **Important: Use Exact Names**
-   - Database service name MUST be `wnba_database` (matches render.yaml)
+   - Database service name MUST be `wnba_stat_spot` (matches render.yaml)
    - Database name MUST be `wnba_stat_spot`
    - User MUST be `wnba_user`
 
@@ -32,14 +32,14 @@ Your application is trying to connect to PostgreSQL but getting "Connection refu
 Your `render.yaml` is already correctly configured:
 ```yaml
 databases:
-  - name: wnba_database          # ✅ Matches service name
+  - name: wnba_stat_spot         # ✅ Matches service name
     databaseName: wnba_stat_spot # ✅ Matches database name
     user: wnba_user              # ✅ Matches user name
 
 envVars:
   - key: DB_HOST
     fromDatabase:
-      name: wnba_database        # ✅ References correct service
+      name: wnba_stat_spot       # ✅ References correct service
       property: host
   # ... other DB variables
 ```
@@ -67,7 +67,7 @@ Once deployed, check the logs:
 
 1. **Check Service Name**
    - Go to your database service in Render
-   - Verify the name is exactly `wnba_database`
+   - Verify the name is exactly `wnba_stat_spot`
    - If different, either rename it or update render.yaml
 
 2. **Check Database Details**
