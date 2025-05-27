@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PlayerController extends Controller
 {
@@ -16,45 +17,77 @@ class PlayerController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $page = $request->get('page', 1);
-        $perPage = min($request->get('per_page', self::PER_PAGE), 500);
-        $search = $request->get('search');
-        $team = $request->get('team');
-        $position = $request->get('position');
+        try {
+            // Check if the table exists
+            if (!Schema::hasTable('wnba_players')) {
+                return response()->json([
+                    'data' => [],
+                    'meta' => [
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => 100,
+                        'total' => 0,
+                        'from' => null,
+                        'to' => null,
+                    ],
+                    'message' => 'Database is still being set up. Please try again in a few minutes.'
+                ]);
+            }
 
-        $cacheKey = "players_list_{$page}_{$perPage}_{$search}_{$team}_{$position}";
+            $page = $request->get('page', 1);
+            $perPage = min($request->get('per_page', self::PER_PAGE), 500);
+            $search = $request->get('search');
+            $team = $request->get('team');
+            $position = $request->get('position');
 
-        $result = Cache::remember($cacheKey, self::CACHE_TTL, function () use ($perPage, $search, $team, $position) {
-            $query = WnbaPlayer::select([
-                'id', 'athlete_id', 'athlete_display_name', 'athlete_position_abbreviation',
-                'athlete_jersey', 'athlete_headshot_href', 'athlete_position_name',
-                'athlete_short_name', 'created_at', 'updated_at'
+            $cacheKey = "players_list_{$page}_{$perPage}_{$search}_{$team}_{$position}";
+
+            $result = Cache::remember($cacheKey, self::CACHE_TTL, function () use ($perPage, $search, $team, $position) {
+                $query = WnbaPlayer::select([
+                    'id', 'athlete_id', 'athlete_display_name', 'athlete_position_abbreviation',
+                    'athlete_jersey', 'athlete_headshot_href', 'athlete_position_name',
+                    'athlete_short_name', 'created_at', 'updated_at'
+                ]);
+
+                if ($search) {
+                    $query->where('athlete_display_name', 'LIKE', "%{$search}%");
+                }
+
+                if ($position) {
+                    $query->where('athlete_position_abbreviation', $position);
+                }
+
+                return $query->orderBy('athlete_display_name')
+                            ->paginate($perPage);
+            });
+
+            return response()->json([
+                'data' => $result->items(),
+                'meta' => [
+                    'current_page' => $result->currentPage(),
+                    'last_page' => $result->lastPage(),
+                    'per_page' => $result->perPage(),
+                    'total' => $result->total(),
+                    'from' => $result->firstItem(),
+                    'to' => $result->lastItem(),
+                ],
+                'message' => 'Players retrieved successfully'
             ]);
-
-            if ($search) {
-                $query->where('athlete_display_name', 'LIKE', "%{$search}%");
-            }
-
-            if ($position) {
-                $query->where('athlete_position_abbreviation', $position);
-            }
-
-            return $query->orderBy('athlete_display_name')
-                        ->paginate($perPage);
-        });
-
-        return response()->json([
-            'data' => $result->items(),
-            'meta' => [
-                'current_page' => $result->currentPage(),
-                'last_page' => $result->lastPage(),
-                'per_page' => $result->perPage(),
-                'total' => $result->total(),
-                'from' => $result->firstItem(),
-                'to' => $result->lastItem(),
-            ],
-            'message' => 'Players retrieved successfully'
-        ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'data' => [],
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 100,
+                    'total' => 0,
+                    'from' => null,
+                    'to' => null,
+                ],
+                'message' => 'Database is still being set up. Please try again in a few minutes.',
+                'error' => $e->getMessage()
+            ], 503);
+        }
     }
 
     public function show(string $id): JsonResponse
@@ -97,21 +130,37 @@ class PlayerController extends Controller
      */
     public function summary(): JsonResponse
     {
-        $cacheKey = "players_summary";
+        try {
+            // Check if the table exists
+            if (!Schema::hasTable('wnba_players')) {
+                return response()->json([
+                    'data' => [],
+                    'message' => 'Database is still being set up. Please try again in a few minutes.'
+                ]);
+            }
 
-        $players = Cache::remember($cacheKey, self::CACHE_TTL * 2, function () {
-            return WnbaPlayer::select([
-                'id', 'athlete_id', 'athlete_display_name', 'athlete_position_abbreviation',
-                'athlete_position_name'
-            ])
-            ->orderBy('athlete_display_name')
-            ->get();
-        });
+            $cacheKey = "players_summary";
 
-        return response()->json([
-            'data' => $players,
-            'message' => 'Players summary retrieved successfully'
-        ]);
+            $players = Cache::remember($cacheKey, self::CACHE_TTL * 2, function () {
+                return WnbaPlayer::select([
+                    'id', 'athlete_id', 'athlete_display_name', 'athlete_position_abbreviation',
+                    'athlete_position_name'
+                ])
+                ->orderBy('athlete_display_name')
+                ->get();
+            });
+
+            return response()->json([
+                'data' => $players,
+                'message' => 'Players summary retrieved successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'data' => [],
+                'message' => 'Database is still being set up. Please try again in a few minutes.',
+                'error' => $e->getMessage()
+            ], 503);
+        }
     }
 
     /**

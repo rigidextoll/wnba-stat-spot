@@ -2,6 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\GameController;
@@ -35,6 +37,92 @@ Route::get('/health', function () {
         'timestamp' => now()->toISOString(),
         'message' => 'API is working'
     ]);
+});
+
+// Database setup status endpoint
+Route::get('/status', function () {
+    try {
+        $status = [
+            'api' => 'ok',
+            'database_connected' => false,
+            'migrations_table' => false,
+            'wnba_tables' => [
+                'wnba_players' => false,
+                'wnba_teams' => false,
+                'wnba_games' => false,
+                'wnba_player_games' => false,
+            ],
+            'queue_tables' => [
+                'jobs' => false,
+                'failed_jobs' => false,
+                'job_batches' => false,
+            ],
+            'setup_complete' => false,
+            'message' => 'Checking database status...'
+        ];
+
+        // Test database connection
+        try {
+            DB::connection()->getPdo();
+            $status['database_connected'] = true;
+        } catch (\Exception $e) {
+            $status['message'] = 'Database connection failed: ' . $e->getMessage();
+            return response()->json($status, 503);
+        }
+
+        // Check if migrations table exists
+        try {
+            DB::table('migrations')->count();
+            $status['migrations_table'] = true;
+        } catch (\Exception $e) {
+            $status['message'] = 'Migrations table not found. Database setup in progress...';
+            return response()->json($status, 503);
+        }
+
+        // Check WNBA tables
+        foreach ($status['wnba_tables'] as $table => $exists) {
+            try {
+                $status['wnba_tables'][$table] = Schema::hasTable($table);
+            } catch (\Exception $e) {
+                // Table check failed
+            }
+        }
+
+        // Check queue tables
+        foreach ($status['queue_tables'] as $table => $exists) {
+            try {
+                $status['queue_tables'][$table] = Schema::hasTable($table);
+            } catch (\Exception $e) {
+                // Table check failed
+            }
+        }
+
+        // Determine if setup is complete
+        $wnbaTablesReady = array_sum($status['wnba_tables']) >= 2; // At least players and teams
+        $queueTablesReady = array_sum($status['queue_tables']) >= 2; // At least jobs and failed_jobs
+
+        $status['setup_complete'] = $status['database_connected'] &&
+                                   $status['migrations_table'] &&
+                                   $wnbaTablesReady &&
+                                   $queueTablesReady;
+
+        if ($status['setup_complete']) {
+            $status['message'] = 'Database setup complete. All systems ready.';
+        } else {
+            $status['message'] = 'Database setup in progress. Please wait...';
+        }
+
+        return response()->json($status, $status['setup_complete'] ? 200 : 503);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'api' => 'ok',
+            'database_connected' => false,
+            'setup_complete' => false,
+            'message' => 'Status check failed: ' . $e->getMessage(),
+            'error' => $e->getMessage()
+        ], 503);
+    }
 });
 
 // Basic data endpoints

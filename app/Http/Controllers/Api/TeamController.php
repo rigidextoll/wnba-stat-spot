@@ -9,6 +9,7 @@ use App\Models\WnbaPlayerGame;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class TeamController extends Controller
 {
@@ -16,25 +17,43 @@ class TeamController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = WnbaTeam::query();
+        try {
+            // Check if the table exists
+            if (!Schema::hasTable('wnba_teams')) {
+                return response()->json([
+                    'data' => [],
+                    'meta' => ['total' => 0],
+                    'message' => 'Database is still being set up. Please try again in a few minutes.'
+                ]);
+            }
 
-        if ($request->has('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('team_display_name', 'like', "%{$search}%")
-                  ->orWhere('team_location', 'like', "%{$search}%")
-                  ->orWhere('team_abbreviation', 'like', "%{$search}%");
-            });
+            $query = WnbaTeam::query();
+
+            if ($request->has('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('team_display_name', 'like', "%{$search}%")
+                      ->orWhere('team_location', 'like', "%{$search}%")
+                      ->orWhere('team_abbreviation', 'like', "%{$search}%");
+                });
+            }
+
+            $teams = $query->orderBy('team_display_name')->get();
+
+            return response()->json([
+                'data' => $teams,
+                'meta' => [
+                    'total' => $teams->count()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'data' => [],
+                'meta' => ['total' => 0],
+                'message' => 'Database is still being set up. Please try again in a few minutes.',
+                'error' => $e->getMessage()
+            ], 503);
         }
-
-        $teams = $query->orderBy('team_display_name')->get();
-
-        return response()->json([
-            'data' => $teams,
-            'meta' => [
-                'total' => $teams->count()
-            ]
-        ]);
     }
 
     public function show(string $teamId): JsonResponse
