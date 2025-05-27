@@ -29,6 +29,13 @@ RUN apk add --no-cache \
     php82-json \
     php82-fileinfo \
     php82-openssl \
+    php82-zip \
+    php82-curl \
+    php82-dom \
+    php82-xmlreader \
+    php82-xmlwriter \
+    php82-simplexml \
+    php82-phar \
     git \
     curl \
     zip \
@@ -42,8 +49,9 @@ RUN apk add --no-cache \
     libwebp-dev \
     libxpm-dev
 
-# Create symlinks for PHP
-RUN ln -sf /usr/bin/php82 /usr/bin/php
+# Create symlinks for PHP and set up PHP configuration
+RUN ln -sf /usr/bin/php82 /usr/bin/php \
+    && ln -sf /usr/sbin/php-fpm82 /usr/sbin/php-fpm
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -51,11 +59,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files
+# Copy composer files first
 COPY composer.json composer.lock ./
 
+# Set PHP memory limit for Composer
+ENV COMPOSER_MEMORY_LIMIT=-1
+
 # Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN php -v && composer --version && composer install --no-dev --optimize-autoloader --no-interaction --verbose
 
 # Copy application code
 COPY . .
