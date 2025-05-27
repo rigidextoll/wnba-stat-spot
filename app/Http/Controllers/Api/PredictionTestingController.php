@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class PredictionTestingController extends Controller
 {
@@ -537,7 +538,7 @@ class PredictionTestingController extends Controller
             'player_id' => 'string|nullable',
             'min_accuracy' => 'numeric|min:0|max:100|nullable',
             'limit' => 'integer|min:1|max:100',
-            'sort_by' => 'string|in:accuracy_percentage,tested_at,player_name,stat_type',
+            'sort_by' => 'string|in:tested_at,accuracy_percentage,player_name,stat_type',
             'sort_order' => 'string|in:asc,desc'
         ]);
 
@@ -545,10 +546,46 @@ class PredictionTestingController extends Controller
         $playerId = $request->input('player_id');
         $minAccuracy = $request->input('min_accuracy');
         $limit = $request->input('limit', 50);
-        $sortBy = $request->input('sort_by', 'accuracy_percentage');
+        $sortBy = $request->input('sort_by', 'tested_at');
         $sortOrder = $request->input('sort_order', 'desc');
 
         try {
+            // Check if the table exists first
+            if (!\Schema::hasTable('prediction_test_results')) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'results' => [],
+                        'analytics' => [
+                            'top_performers' => [],
+                            'stat_performance' => [],
+                            'player_rankings' => [],
+                            'accuracy_trends' => [],
+                            'summary_stats' => [
+                                'total_tests' => 0,
+                                'unique_players' => 0,
+                                'avg_accuracy_by_stat' => [],
+                                'accuracy_distribution' => [
+                                    'excellent' => 0,
+                                    'good' => 0,
+                                    'fair' => 0,
+                                    'poor' => 0
+                                ]
+                            ]
+                        ],
+                        'filters_applied' => [
+                            'stat_type' => $statType,
+                            'player_id' => $playerId,
+                            'min_accuracy' => $minAccuracy,
+                            'limit' => $limit,
+                            'sort_by' => $sortBy,
+                            'sort_order' => $sortOrder
+                        ],
+                        'message' => 'Historical testing system not yet initialized.'
+                    ]
+                ]);
+            }
+
             // Build query
             $query = PredictionTestResult::query();
 
@@ -598,7 +635,12 @@ class PredictionTestingController extends Controller
             Log::error('Failed to get historical results: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to retrieve historical results'
+                'error' => 'Failed to retrieve historical results',
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
             ], 500);
         }
     }
@@ -609,6 +651,26 @@ class PredictionTestingController extends Controller
     public function getTestingStatus(): JsonResponse
     {
         try {
+            // Check if the table exists first
+            if (!\Schema::hasTable('prediction_test_results')) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'recent_batches' => [],
+                        'overall_stats' => [
+                            'total_tests_run' => 0,
+                            'average_accuracy' => 0,
+                            'best_accuracy' => 0,
+                            'worst_accuracy' => 0,
+                            'total_players_tested' => 0,
+                            'last_test_run' => null
+                        ],
+                        'status' => 'not_initialized',
+                        'message' => 'Historical testing system not yet initialized. Run migrations to set up the database.'
+                    ]
+                ]);
+            }
+
             // Get recent test batches
             $recentBatches = PredictionTestResult::selectRaw('
                 test_batch_id,
@@ -647,7 +709,12 @@ class PredictionTestingController extends Controller
             Log::error('Failed to get testing status: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to get testing status'
+                'error' => 'Failed to get testing status',
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
             ], 500);
         }
     }
@@ -666,6 +733,21 @@ class PredictionTestingController extends Controller
         $limit = $request->input('limit', 20);
 
         try {
+            // Check if the table exists first
+            if (!\Schema::hasTable('prediction_test_results')) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'leaderboard' => [],
+                        'filters' => [
+                            'stat_type' => $statType,
+                            'limit' => $limit
+                        ],
+                        'message' => 'Historical testing system not yet initialized.'
+                    ]
+                ]);
+            }
+
             $query = PredictionTestResult::selectRaw('
                 player_id,
                 player_name,
@@ -702,7 +784,12 @@ class PredictionTestingController extends Controller
             Log::error('Failed to get leaderboard: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to get leaderboard'
+                'error' => 'Failed to get leaderboard',
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
             ], 500);
         }
     }

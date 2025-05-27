@@ -17,6 +17,17 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// Simple test endpoint (no database required)
+Route::get('/test', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'API is working',
+        'timestamp' => now()->toISOString(),
+        'php_version' => PHP_VERSION,
+        'laravel_version' => app()->version()
+    ]);
+});
+
 // Health check endpoint for container debugging
 Route::get('/health', function () {
     return response()->json([

@@ -7,6 +7,27 @@ echo "🔧 Configuring nginx for port ${PORT:-80}..."
 sed "s/PORT_PLACEHOLDER/${PORT:-80}/g" /etc/nginx/nginx.conf > /tmp/nginx.conf
 mv /tmp/nginx.conf /etc/nginx/nginx.conf
 
+# Configure PHP-FPM to listen on 127.0.0.1:9000
+echo "🔧 Configuring PHP-FPM..."
+cat > /etc/php82/php-fpm.d/www.conf << 'EOF'
+[www]
+user = nginx
+group = nginx
+listen = 127.0.0.1:9000
+listen.owner = nginx
+listen.group = nginx
+listen.mode = 0660
+pm = dynamic
+pm.max_children = 50
+pm.start_servers = 5
+pm.min_spare_servers = 5
+pm.max_spare_servers = 35
+pm.max_requests = 500
+catch_workers_output = yes
+php_admin_value[error_log] = /tmp/php-fpm-error.log
+php_admin_flag[log_errors] = on
+EOF
+
 # Test nginx configuration
 echo "🔍 Testing nginx configuration..."
 nginx -t || {
@@ -77,6 +98,17 @@ else
     echo "⚠️  Cannot check port binding (netstat/ss not available)"
 fi
 
+# Test PHP-FPM port
+echo "🔍 Testing PHP-FPM port 9000..."
+sleep 2
+if command -v netstat > /dev/null; then
+    netstat -tlnp | grep ":9000" || echo "⚠️  PHP-FPM not listening on port 9000"
+elif command -v ss > /dev/null; then
+    ss -tlnp | grep ":9000" || echo "⚠️  PHP-FPM not listening on port 9000"
+else
+    echo "⚠️  Cannot check PHP-FPM port binding"
+fi
+
 # Test SvelteKit service
 echo "🔍 Testing SvelteKit service..."
 sleep 2
@@ -96,6 +128,34 @@ else
     echo "⚠️  Laravel API not responding"
     echo "📋 PHP-FPM logs:"
     tail -20 /tmp/php-fpm.log 2>/dev/null || echo "No PHP-FPM logs found"
+
+    echo "📋 PHP-FPM error logs:"
+    tail -20 /tmp/php-fpm-error.log 2>/dev/null || echo "No PHP-FPM error logs found"
+
+    echo "📋 Nginx error logs:"
+    tail -20 /tmp/nginx-error.log 2>/dev/null || echo "No nginx error logs found"
+
+    echo "🔍 Testing simple API endpoint:"
+    curl -v http://localhost:${PORT:-80}/api/test 2>&1 || echo "Simple API test failed"
+
+    echo "🔍 Testing PHP-FPM directly:"
+    if command -v php > /dev/null; then
+        echo "PHP version: $(php --version | head -1)"
+        echo "Testing basic PHP execution:"
+        php -r "echo 'PHP is working\n';" || echo "PHP execution failed"
+
+        echo "Testing Laravel artisan:"
+        cd /var/www/html
+        php artisan --version || echo "Laravel artisan failed"
+
+        echo "Testing database connection:"
+        php artisan migrate:status || echo "Database connection failed"
+    else
+        echo "PHP not found in PATH"
+    fi
+
+    echo "🔍 Checking process status:"
+    ps aux | grep -E "(php|nginx)" | grep -v grep || echo "No PHP/nginx processes found"
 fi
 
 # Function to wait for database with timeout (run in background)
