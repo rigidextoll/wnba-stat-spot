@@ -267,6 +267,17 @@ wait_for_database() {
         if php artisan migrate:status > /dev/null 2>&1; then
             echo "✅ Database connection established"
 
+            # Run database migrations first
+            echo "📊 Running database migrations..."
+            php artisan migrate --force || echo "⚠️  Migrations failed, continuing..."
+
+            # Create queue tables if they don't exist
+            echo "📋 Setting up queue tables..."
+            php artisan queue:table --force 2>/dev/null || echo "Queue table migration already exists"
+            php artisan queue:failed-table --force 2>/dev/null || echo "Failed jobs table migration already exists"
+            php artisan queue:batches-table --force 2>/dev/null || echo "Job batches table migration already exists"
+            php artisan migrate --force || echo "⚠️  Queue table migrations failed, continuing..."
+
             # Laravel optimizations (with error handling)
             echo "⚡ Optimizing Laravel application..."
             php artisan config:cache || echo "⚠️  Config cache failed, continuing..."

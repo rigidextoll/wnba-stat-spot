@@ -39,7 +39,14 @@ ensure_queue_tables() {
 
     # Check if jobs table exists
     if ! php artisan tinker --execute="echo Schema::hasTable('jobs') ? 'exists' : 'missing';" 2>/dev/null | grep -q "exists"; then
-        echo "⚠️  Jobs table missing, running migrations..."
+        echo "⚠️  Jobs table missing, creating queue tables..."
+
+        # Create queue table migrations
+        php artisan queue:table --force 2>/dev/null || echo "Queue table migration already exists"
+        php artisan queue:failed-table --force 2>/dev/null || echo "Failed jobs table migration already exists"
+        php artisan queue:batches-table --force 2>/dev/null || echo "Job batches table migration already exists"
+
+        # Run migrations
         php artisan migrate --force || {
             echo "❌ Migration failed"
             return 1
