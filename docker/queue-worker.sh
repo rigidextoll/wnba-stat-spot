@@ -15,6 +15,14 @@ check_database() {
     echo "  DB_HOST: ${DB_HOST:-not_set}"
     echo "  DB_PORT: ${DB_PORT:-not_set}"
     echo "  DB_DATABASE: ${DB_DATABASE:-not_set}"
+    echo "  DB_USERNAME: ${DB_USERNAME:-not_set}"
+    echo "  DB_PASSWORD: ${DB_PASSWORD:+***set***}"
+
+    # Check if we're trying to connect to localhost (wrong in production)
+    if [ "${DB_HOST:-127.0.0.1}" = "127.0.0.1" ]; then
+        echo "  ⚠️  WARNING: DB_HOST is localhost - this won't work in production!"
+        echo "  💡 Check that Render database environment variables are set"
+    fi
 
     # Check what Laravel thinks the connection is
     local laravel_connection=$(php artisan tinker --execute="echo config('database.default');" 2>/dev/null | tail -1)
@@ -86,6 +94,12 @@ while [ $attempt -le $max_attempts ]; do
 
         echo "🔍 Testing PostgreSQL connection directly..."
         php artisan tinker --execute="try { DB::connection('pgsql')->getPdo(); echo 'PostgreSQL Connected'; } catch(Exception \$e) { echo 'PostgreSQL Error: ' . \$e->getMessage(); }" || echo "PostgreSQL test failed"
+
+        echo "🔍 Checking network connectivity to database host..."
+        if [ "${DB_HOST:-127.0.0.1}" != "127.0.0.1" ]; then
+            echo "Testing connection to ${DB_HOST}:${DB_PORT:-5432}..."
+            nc -z "${DB_HOST}" "${DB_PORT:-5432}" 2>/dev/null && echo "✅ Network connection OK" || echo "❌ Cannot reach database host"
+        fi
 
         exit 1
     fi

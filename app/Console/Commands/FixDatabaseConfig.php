@@ -150,6 +150,20 @@ class FixDatabaseConfig extends Command
             $this->line('     - Add DB_PASSWORD to your Render environment');
         }
 
+        // Check for localhost connection in production
+        if (env('DB_HOST') === '127.0.0.1' || env('DB_HOST') === 'localhost') {
+            $this->error('  7. Database host is set to localhost');
+            $this->line('     - This will not work in production (Render)');
+            $this->line('     - Render should provide the actual database host');
+            $this->line('     - Check your Render database service configuration');
+        }
+
+        if (!env('DB_HOST')) {
+            $this->error('  8. Database host not set - will default to localhost');
+            $this->line('     - This will fail in production');
+            $this->line('     - Render should auto-populate DB_HOST from database service');
+        }
+
         $this->newLine();
         $this->info('🚀 Next Steps:');
         $this->line('  1. Ensure all environment variables are set in Render');
