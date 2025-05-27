@@ -17,6 +17,22 @@ nginx -t || {
 
 echo "✅ Nginx configuration is valid"
 
+# Check if SvelteKit build exists
+echo "🔍 Checking SvelteKit build..."
+if [ -d "/var/www/html/frontend-build" ]; then
+    echo "✅ SvelteKit build directory exists"
+    ls -la /var/www/html/frontend-build/
+    if [ -f "/var/www/html/frontend-build/index.js" ]; then
+        echo "✅ SvelteKit index.js found"
+    else
+        echo "❌ SvelteKit index.js not found"
+        ls -la /var/www/html/frontend-build/
+    fi
+else
+    echo "❌ SvelteKit build directory not found"
+    ls -la /var/www/html/
+fi
+
 # Start supervisord immediately to bind to port
 echo "🔧 Starting application services..."
 supervisord -c /etc/supervisor/conf.d/supervisord.conf &
@@ -36,6 +52,27 @@ elif command -v ss > /dev/null; then
     ss -tlnp | grep ":${PORT:-80}" || echo "⚠️  Port ${PORT:-80} not bound yet"
 else
     echo "⚠️  Cannot check port binding (netstat/ss not available)"
+fi
+
+# Test SvelteKit service
+echo "🔍 Testing SvelteKit service..."
+sleep 2
+if curl -f http://localhost:3000 > /dev/null 2>&1; then
+    echo "✅ SvelteKit is responding on port 3000"
+else
+    echo "⚠️  SvelteKit not responding on port 3000"
+    echo "📋 SvelteKit logs:"
+    tail -20 /tmp/sveltekit.log 2>/dev/null || echo "No SvelteKit logs found"
+fi
+
+# Test Laravel API
+echo "🔍 Testing Laravel API..."
+if curl -f http://localhost:${PORT:-80}/health > /dev/null 2>&1; then
+    echo "✅ Laravel API is responding"
+else
+    echo "⚠️  Laravel API not responding"
+    echo "📋 PHP-FPM logs:"
+    tail -20 /tmp/php-fpm.log 2>/dev/null || echo "No PHP-FPM logs found"
 fi
 
 # Function to wait for database with timeout (run in background)
