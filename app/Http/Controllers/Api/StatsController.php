@@ -12,7 +12,7 @@ class StatsController extends Controller
     {
         $stats = WnbaPlayerGame::with(['player', 'team', 'game'])
             ->orderBy('points', 'desc')
-            ->limit(100)
+            ->limit(500)
             ->get();
 
         return response()->json([

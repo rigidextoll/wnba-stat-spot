@@ -4,16 +4,131 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WnbaTeam;
+use App\Models\WnbaPlayer;
+use App\Models\WnbaPlayerGame;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class TeamController extends Controller
 {
-    public function index(): JsonResponse
+    private const CACHE_TTL = 3600 * 2; // 1 hour (teams change less frequently)
+
+    public function index(Request $request): JsonResponse
     {
-        $teams = WnbaTeam::all();
+        $query = WnbaTeam::query();
+
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('team_display_name', 'like', "%{$search}%")
+                  ->orWhere('team_location', 'like', "%{$search}%")
+                  ->orWhere('team_abbreviation', 'like', "%{$search}%");
+            });
+        }
+
+        $teams = $query->orderBy('team_display_name')->get();
+
         return response()->json([
             'data' => $teams,
-            'message' => 'Teams retrieved successfully'
+            'meta' => [
+                'total' => $teams->count()
+            ]
+        ]);
+    }
+
+    public function show(string $teamId): JsonResponse
+    {
+        $team = WnbaTeam::where('team_id', $teamId)->first();
+
+        if (!$team) {
+            return response()->json([
+                'error' => 'Team not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => $team
+        ]);
+    }
+
+    public function players(string $teamId): JsonResponse
+    {
+        $team = WnbaTeam::where('team_id', $teamId)->first();
+
+        if (!$team) {
+            return response()->json([
+                'error' => 'Team not found'
+            ], 404);
+        }
+
+        // Get players who have played for this team by analyzing game data
+        // Use the internal team ID (not team_id) to match with player games
+        $playerIds = WnbaPlayerGame::where('team_id', $team->id)
+            ->where('did_not_play', false)
+            ->distinct()
+            ->pluck('player_id');
+
+        // Get the actual player records
+        $players = WnbaPlayer::whereIn('id', $playerIds)
+            ->orderBy('athlete_display_name')
+            ->get();
+
+        // Add team information to each player
+        $playersWithTeam = $players->map(function ($player) use ($team) {
+            $playerArray = $player->toArray();
+            $playerArray['current_team'] = [
+                'team_id' => $team->team_id,
+                'team_display_name' => $team->team_display_name,
+                'team_abbreviation' => $team->team_abbreviation,
+                'team_logo' => $team->team_logo
+            ];
+            return $playerArray;
+        });
+
+        return response()->json([
+            'data' => $playersWithTeam,
+            'meta' => [
+                'total' => $playersWithTeam->count(),
+                'team' => $team
+            ]
+        ]);
+    }
+
+    /**
+     * Get teams summary for dropdowns and quick access
+     */
+    public function summary(): JsonResponse
+    {
+        $cacheKey = "teams_summary";
+
+        $teams = Cache::remember($cacheKey, self::CACHE_TTL * 2, function () {
+            return WnbaTeam::select([
+                'id', 'team_id', 'team_abbreviation', 'team_display_name', 'team_logo'
+            ])
+            ->orderBy('team_display_name')
+            ->get();
+        });
+
+        return response()->json([
+            'data' => $teams,
+            'message' => 'Teams summary retrieved successfully'
+        ]);
+    }
+
+    /**
+     * Clear team cache
+     */
+    public function clearCache(): JsonResponse
+    {
+        $patterns = ['teams_list_*', 'teams_summary'];
+
+        foreach ($patterns as $pattern) {
+            Cache::forget($pattern);
+        }
+
+        return response()->json([
+            'message' => 'Team cache cleared successfully'
         ]);
     }
 }

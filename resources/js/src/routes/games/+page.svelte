@@ -1,32 +1,20 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { api } from '$lib/api/client';
+    import type { Game } from '$lib/api/client';
     import DefaultLayout from "$lib/layouts/DefaultLayout.svelte";
-
-    interface Game {
-        id: number;
-        game_id: string;
-        season: string;
-        season_type: string;
-        game_date: string;
-        game_date_time: string;
-        venue_name: string | null;
-        venue_city: string | null;
-        venue_state: string | null;
-        status_name: string | null;
-        created_at: string;
-        updated_at: string;
-    }
 
     let games: Game[] = [];
     let loading = true;
     let error: string | null = null;
     let searchTerm = '';
+    let viewMode: 'cards' | 'table' = 'cards';
 
     $: filteredGames = games.filter(game =>
         (game.venue_name && game.venue_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (game.venue_city && game.venue_city.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        game.season.toLowerCase().includes(searchTerm.toLowerCase())
+        game.season.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        game.game_id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     onMount(async () => {
@@ -56,6 +44,13 @@
             hour12: true
         });
     }
+
+    function formatDateShort(dateString: string): string {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+        });
+    }
 </script>
 
 <DefaultLayout>
@@ -73,9 +68,9 @@
             </div>
         </div>
 
-        <!-- Search Bar -->
+        <!-- Controls -->
         <div class="row mb-3">
-            <div class="col-12">
+            <div class="col-md-8">
                 <div class="card">
                     <div class="card-body">
                         <div class="input-group">
@@ -85,9 +80,31 @@
                             <input
                                 type="text"
                                 class="form-control"
-                                placeholder="Search games by venue, city, or season..."
+                                placeholder="Search games by venue, city, season, or game ID..."
                                 bind:value={searchTerm}
                             />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="btn-group w-100" role="group">
+                            <button
+                                type="button"
+                                class="btn {viewMode === 'cards' ? 'btn-warning' : 'btn-outline-warning'}"
+                                on:click={() => viewMode = 'cards'}
+                            >
+                                <i class="fas fa-th-large me-1"></i>Cards
+                            </button>
+                            <button
+                                type="button"
+                                class="btn {viewMode === 'table' ? 'btn-warning' : 'btn-outline-warning'}"
+                                on:click={() => viewMode = 'table'}
+                            >
+                                <i class="fas fa-table me-1"></i>Table
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -115,7 +132,124 @@
                     </div>
                 </div>
             </div>
+        {:else if viewMode === 'table'}
+            <!-- Table View -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Games ({filteredGames.length})</h5>
+                        </div>
+                        <div class="card-body">
+                            {#if filteredGames.length > 0}
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Game</th>
+                                                <th>Matchup</th>
+                                                <th>Date</th>
+                                                <th>Time</th>
+                                                <th>Venue</th>
+                                                <th>Location</th>
+                                                <th>Status</th>
+                                                <th class="text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each filteredGames as game}
+                                                <tr>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="avatar-xs bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                                <i class="fas fa-basketball text-warning fs-12"></i>
+                                                            </div>
+                                                            <div>
+                                                                <div class="fw-semibold">{game.game_id}</div>
+                                                                <small class="text-muted">{game.season} {game.season_type}</small>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        {#if game.away_team && game.home_team}
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <div class="d-flex align-items-center">
+                                                                    {#if game.away_team.logo}
+                                                                        <img src={game.away_team.logo} alt={game.away_team.abbreviation} class="avatar-xs rounded me-2" />
+                                                                    {/if}
+                                                                    <span class="fw-medium">{game.away_team.abbreviation}</span>
+                                                                    {#if game.final_score?.final && game.away_team.score !== null}
+                                                                        <span class="ms-2 badge bg-{game.away_team.winner ? 'success' : 'secondary'}-subtle text-{game.away_team.winner ? 'success' : 'secondary'}">
+                                                                            {game.away_team.score}
+                                                                        </span>
+                                                                    {/if}
+                                                                </div>
+                                                                <span class="text-muted mx-2">@</span>
+                                                                <div class="d-flex align-items-center">
+                                                                    {#if game.home_team.logo}
+                                                                        <img src={game.home_team.logo} alt={game.home_team.abbreviation} class="avatar-xs rounded me-2" />
+                                                                    {/if}
+                                                                    <span class="fw-medium">{game.home_team.abbreviation}</span>
+                                                                    {#if game.final_score?.final && game.home_team.score !== null}
+                                                                        <span class="ms-2 badge bg-{game.home_team.winner ? 'success' : 'secondary'}-subtle text-{game.home_team.winner ? 'success' : 'secondary'}">
+                                                                            {game.home_team.score}
+                                                                        </span>
+                                                                    {/if}
+                                                                </div>
+                                                            </div>
+                                                        {:else}
+                                                            <span class="text-muted">Teams TBD</span>
+                                                        {/if}
+                                                    </td>
+                                                    <td>{formatDateShort(game.game_date)}</td>
+                                                    <td>
+                                                        <small>{formatTime(game.game_date_time)}</small>
+                                                    </td>
+                                                    <td>
+                                                        <div class="fw-semibold">{game.venue_name || 'TBD'}</div>
+                                                    </td>
+                                                    <td>
+                                                        {#if game.venue_city && game.venue_state}
+                                                            <small class="text-muted">{game.venue_city}, {game.venue_state}</small>
+                                                        {:else}
+                                                            <small class="text-muted">TBD</small>
+                                                        {/if}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{game.status_name === 'STATUS_FINAL' ? 'success' : game.status_name === 'STATUS_SCHEDULED' ? 'secondary' : 'warning'}">
+                                                            {game.status_name === 'STATUS_FINAL' ? 'Final' :
+                                                             game.status_name === 'STATUS_SCHEDULED' ? 'Scheduled' :
+                                                             game.status_name || 'TBD'}
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button class="btn btn-outline-warning btn-sm me-1">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-secondary btn-sm">
+                                                            <i class="fas fa-chart-bar"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {:else}
+                                <div class="text-center py-4">
+                                    <div class="avatar-lg bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3">
+                                        <i class="fas fa-search text-muted fs-24"></i>
+                                    </div>
+                                    <h5 class="mb-2">No Games Found</h5>
+                                    <p class="text-muted mb-0">No games match your search criteria.</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            </div>
         {:else}
+            <!-- Card View -->
             <div class="row">
                 {#each filteredGames as game}
                     <div class="col-xl-4 col-md-6 mb-4">

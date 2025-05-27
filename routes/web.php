@@ -2,16 +2,9 @@
 
 use App\Http\Controllers\Main;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\TeamController;
-use App\Http\Controllers\Api\PlayerController;
-use App\Http\Controllers\Api\GameController;
-use App\Http\Controllers\Api\StatsController;
 
+// Main SPA route - serves the Svelte app
 Route::get('/', [Main::class, 'main'])->name('main');
 
-//// API ROUTES ////
-Route::get('/api/teams', [TeamController::class, 'index']);
-Route::get('/api/players', [PlayerController::class, 'index']);
-Route::get('/api/players/{id}', [PlayerController::class, 'show']);
-Route::get('/api/games', [GameController::class, 'index']);
-Route::get('/api/stats', [StatsController::class, 'index']);
+// Catch-all route for SPA routing (Svelte Router) - MUST BE LAST
+Route::get('/{any}', [Main::class, 'main'])->where('any', '.*')->name('spa');

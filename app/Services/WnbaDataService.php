@@ -219,7 +219,7 @@ class WnbaDataService
                 'team_logo' => $this->getOptionalValue($record, 'team_logo'),
                 'team_color' => $this->getOptionalValue($record, 'team_color'),
                 'team_alternate_color' => $this->getOptionalValue($record, 'team_alternate_color'),
-                'home_away' => $this->getOptionalValue($record, 'home_away'),
+                'home_away' => $this->getOptionalValue($record, 'team_home_away'),
                 'team_winner' => $this->getOptionalBool($record, 'team_winner'),
                 'team_score' => $this->getOptionalValue($record, 'team_score'),
                 'opponent_team_id' => $this->getOptionalValue($record, 'opponent_team_id'),
@@ -377,6 +377,11 @@ class WnbaDataService
     public function saveBoxScoreData(array $records): void
     {
         foreach ($records as $record) {
+            // Skip records with missing required fields
+            if (empty($record['game_id']) || empty($record['team_id']) || empty($record['athlete_id'])) {
+                continue;
+            }
+
             // Create or update game
             $game = WnbaGame::updateOrCreate(
                 ['game_id' => $record['game_id']],
@@ -392,44 +397,47 @@ class WnbaDataService
             $team = WnbaTeam::updateOrCreate(
                 ['team_id' => $record['team_id']],
                 [
-                    'team_name' => $record['team_name'],
-                    'team_location' => $record['team_location'],
-                    'team_abbreviation' => $record['team_abbreviation'],
-                    'team_display_name' => $record['team_display_name'],
-                    'team_uid' => $record['team_uid'],
-                    'team_slug' => $record['team_slug'],
-                    'team_logo' => $record['team_logo'],
-                    'team_color' => $record['team_color'],
-                    'team_alternate_color' => $record['team_alternate_color'],
+                    'team_name' => $record['team_name'] ?? 'Unknown Team',
+                    'team_location' => $record['team_location'] ?? 'Unknown',
+                    'team_abbreviation' => $record['team_abbreviation'] ?? 'UNK',
+                    'team_display_name' => $record['team_display_name'] ?? 'Unknown Team',
+                    'team_uid' => $record['team_uid'] ?? null,
+                    'team_slug' => $record['team_slug'] ?? null,
+                    'team_logo' => $record['team_logo'] ?? null,
+                    'team_color' => $record['team_color'] ?? null,
+                    'team_alternate_color' => $record['team_alternate_color'] ?? null,
                 ]
             );
 
-            // Create or update opponent team
-            $opponentTeam = WnbaTeam::updateOrCreate(
-                ['team_id' => $record['opponent_team_id']],
-                [
-                    'team_name' => $record['opponent_team_name'],
-                    'team_location' => $record['opponent_team_location'],
-                    'team_abbreviation' => $record['opponent_team_abbreviation'],
-                    'team_display_name' => $record['opponent_team_display_name'],
-                    'team_uid' => $record['opponent_team_uid'] ?? null,
-                    'team_slug' => $record['opponent_team_slug'] ?? null,
-                    'team_logo' => $record['opponent_team_logo'],
-                    'team_color' => $record['opponent_team_color'],
-                    'team_alternate_color' => $record['opponent_team_alternate_color'],
-                ]
-            );
+            // Create or update opponent team (only if opponent_team_id exists)
+            $opponentTeam = null;
+            if (!empty($record['opponent_team_id'])) {
+                $opponentTeam = WnbaTeam::updateOrCreate(
+                    ['team_id' => $record['opponent_team_id']],
+                    [
+                        'team_name' => $record['opponent_team_name'] ?? 'Unknown Team',
+                        'team_location' => $record['opponent_team_location'] ?? 'Unknown',
+                        'team_abbreviation' => $record['opponent_team_abbreviation'] ?? 'UNK',
+                        'team_display_name' => $record['opponent_team_display_name'] ?? 'Unknown Team',
+                        'team_uid' => $record['opponent_team_uid'] ?? null,
+                        'team_slug' => $record['opponent_team_slug'] ?? null,
+                        'team_logo' => $record['opponent_team_logo'] ?? null,
+                        'team_color' => $record['opponent_team_color'] ?? null,
+                        'team_alternate_color' => $record['opponent_team_alternate_color'] ?? null,
+                    ]
+                );
+            }
 
             // Create or update player
             $player = WnbaPlayer::updateOrCreate(
                 ['athlete_id' => $record['athlete_id']],
                 [
-                    'athlete_display_name' => $record['athlete_display_name'],
-                    'athlete_short_name' => $record['athlete_short_name'],
-                    'athlete_jersey' => $record['athlete_jersey'],
-                    'athlete_headshot_href' => $record['athlete_headshot_href'],
-                    'athlete_position_name' => $record['athlete_position_name'],
-                    'athlete_position_abbreviation' => $record['athlete_position_abbreviation'],
+                    'athlete_display_name' => $record['athlete_display_name'] ?? 'Unknown Player',
+                    'athlete_short_name' => $record['athlete_short_name'] ?? 'Unknown',
+                    'athlete_jersey' => $record['athlete_jersey'] ?? null,
+                    'athlete_headshot_href' => $record['athlete_headshot_href'] ?? null,
+                    'athlete_position_name' => $record['athlete_position_name'] ?? null,
+                    'athlete_position_abbreviation' => $record['athlete_position_abbreviation'] ?? null,
                 ]
             );
 
@@ -441,28 +449,28 @@ class WnbaDataService
                 ],
                 [
                     'team_id' => $team->id,
-                    'minutes' => $record['minutes'],
-                    'field_goals_made' => $record['field_goals_made'],
-                    'field_goals_attempted' => $record['field_goals_attempted'],
-                    'three_point_field_goals_made' => $record['three_point_field_goals_made'],
-                    'three_point_field_goals_attempted' => $record['three_point_field_goals_attempted'],
-                    'free_throws_made' => $record['free_throws_made'],
-                    'free_throws_attempted' => $record['free_throws_attempted'],
-                    'offensive_rebounds' => $record['offensive_rebounds'],
-                    'defensive_rebounds' => $record['defensive_rebounds'],
-                    'rebounds' => $record['rebounds'],
-                    'assists' => $record['assists'],
-                    'steals' => $record['steals'],
-                    'blocks' => $record['blocks'],
-                    'turnovers' => $record['turnovers'],
-                    'fouls' => $record['fouls'],
-                    'plus_minus' => $record['plus_minus'],
-                    'points' => $record['points'],
-                    'starter' => $record['starter'],
-                    'ejected' => $record['ejected'],
-                    'did_not_play' => $record['did_not_play'],
-                    'reason' => $record['reason'],
-                    'active' => $record['active'],
+                    'minutes' => $record['minutes'] ?? 0,
+                    'field_goals_made' => $record['field_goals_made'] ?? 0,
+                    'field_goals_attempted' => $record['field_goals_attempted'] ?? 0,
+                    'three_point_field_goals_made' => $record['three_point_field_goals_made'] ?? 0,
+                    'three_point_field_goals_attempted' => $record['three_point_field_goals_attempted'] ?? 0,
+                    'free_throws_made' => $record['free_throws_made'] ?? 0,
+                    'free_throws_attempted' => $record['free_throws_attempted'] ?? 0,
+                    'offensive_rebounds' => $record['offensive_rebounds'] ?? 0,
+                    'defensive_rebounds' => $record['defensive_rebounds'] ?? 0,
+                    'rebounds' => $record['rebounds'] ?? 0,
+                    'assists' => $record['assists'] ?? 0,
+                    'steals' => $record['steals'] ?? 0,
+                    'blocks' => $record['blocks'] ?? 0,
+                    'turnovers' => $record['turnovers'] ?? 0,
+                    'fouls' => $record['fouls'] ?? 0,
+                    'plus_minus' => $record['plus_minus'] ?? 0,
+                    'points' => $record['points'] ?? 0,
+                    'starter' => $record['starter'] ?? false,
+                    'ejected' => $record['ejected'] ?? false,
+                    'did_not_play' => $record['did_not_play'] ?? false,
+                    'reason' => $record['reason'] ?? null,
+                    'active' => $record['active'] ?? true,
                 ]
             );
         }
@@ -471,6 +479,16 @@ class WnbaDataService
     public function saveTeamData(array $records): void
     {
         foreach ($records as $record) {
+            // Skip records with missing required fields
+            if (empty($record['game_id']) || empty($record['team_id']) || empty($record['opponent_team_id'])) {
+                continue;
+            }
+
+            // Skip records with invalid home_away values
+            if (empty($record['home_away']) || !in_array($record['home_away'], ['home', 'away'])) {
+                continue;
+            }
+
             // Create or update game
             $game = WnbaGame::updateOrCreate(
                 ['game_id' => $record['game_id']],
@@ -490,8 +508,8 @@ class WnbaDataService
                     'team_location' => $record['team_location'],
                     'team_abbreviation' => $record['team_abbreviation'],
                     'team_display_name' => $record['team_display_name'],
-                    'team_uid' => $record['team_uid'],
-                    'team_slug' => $record['team_slug'],
+                    'team_uid' => $record['team_uid'] ?? null,
+                    'team_slug' => $record['team_slug'] ?? null,
                     'team_logo' => $record['team_logo'],
                     'team_color' => $record['team_color'],
                     'team_alternate_color' => $record['team_alternate_color'],
@@ -523,23 +541,23 @@ class WnbaDataService
                 [
                     'opponent_team_id' => $opponentTeam->id,
                     'home_away' => $record['home_away'],
-                    'team_winner' => $record['team_winner'],
-                    'team_score' => $record['team_score'],
-                    'opponent_team_score' => $record['opponent_team_score'],
-                    'field_goals_made' => $record['field_goals_made'],
-                    'field_goals_attempted' => $record['field_goals_attempted'],
-                    'three_point_field_goals_made' => $record['three_point_field_goals_made'],
-                    'three_point_field_goals_attempted' => $record['three_point_field_goals_attempted'],
-                    'free_throws_made' => $record['free_throws_made'],
-                    'free_throws_attempted' => $record['free_throws_attempted'],
-                    'offensive_rebounds' => $record['offensive_rebounds'],
-                    'defensive_rebounds' => $record['defensive_rebounds'],
-                    'rebounds' => $record['rebounds'],
-                    'assists' => $record['assists'],
-                    'steals' => $record['steals'],
-                    'blocks' => $record['blocks'],
-                    'turnovers' => $record['turnovers'],
-                    'fouls' => $record['fouls'],
+                    'team_winner' => $record['team_winner'] ?? false,
+                    'team_score' => $record['team_score'] ?? 0,
+                    'opponent_team_score' => $record['opponent_team_score'] ?? 0,
+                    'field_goals_made' => $record['field_goals_made'] ?? 0,
+                    'field_goals_attempted' => $record['field_goals_attempted'] ?? 0,
+                    'three_point_field_goals_made' => $record['three_point_field_goals_made'] ?? 0,
+                    'three_point_field_goals_attempted' => $record['three_point_field_goals_attempted'] ?? 0,
+                    'free_throws_made' => $record['free_throws_made'] ?? 0,
+                    'free_throws_attempted' => $record['free_throws_attempted'] ?? 0,
+                    'offensive_rebounds' => $record['offensive_rebounds'] ?? 0,
+                    'defensive_rebounds' => $record['defensive_rebounds'] ?? 0,
+                    'rebounds' => $record['rebounds'] ?? 0,
+                    'assists' => $record['assists'] ?? 0,
+                    'steals' => $record['steals'] ?? 0,
+                    'blocks' => $record['blocks'] ?? 0,
+                    'turnovers' => $record['turnovers'] ?? 0,
+                    'fouls' => $record['fouls'] ?? 0,
                 ]
             );
         }

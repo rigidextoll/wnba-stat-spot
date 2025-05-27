@@ -155,7 +155,14 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">Top Performances</h5>
+                            <h5 class="card-title mb-0">
+                                Top Performances
+                                {#if sortedStats.length > 0}
+                                    <span class="badge bg-primary-subtle text-primary ms-2">
+                                        Showing {Math.min(sortedStats.length, 200)} of {sortedStats.length}
+                                    </span>
+                                {/if}
+                            </h5>
                         </div>
                         <div class="card-body">
                             {#if sortedStats.length > 0}
@@ -177,7 +184,7 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {#each sortedStats.slice(0, 50) as stat, index}
+                                            {#each sortedStats.slice(0, 200) as stat, index}
                                                 <tr>
                                                     <td>
                                                         <span class="badge bg-secondary">{index + 1}</span>

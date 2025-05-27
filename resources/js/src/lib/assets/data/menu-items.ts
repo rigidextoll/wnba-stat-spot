@@ -3,7 +3,7 @@ import type {MenuItemType} from "$lib/types/menu";
 export const MENU_ITEMS: MenuItemType[] = [
     {
         key: 'wnba',
-        label: 'WNBA',
+        label: 'WNBA ANALYTICS',
         isTitle: true,
     },
     {
@@ -11,6 +11,11 @@ export const MENU_ITEMS: MenuItemType[] = [
         icon: 'iconamoon:home-duotone',
         label: 'Dashboard',
         url: '/',
+    },
+    {
+        key: 'data-overview',
+        label: 'DATA',
+        isTitle: true,
     },
     {
         key: 'teams',
@@ -37,45 +42,21 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/stats',
     },
     {
-        key: 'data-management',
-        label: 'DATA MANAGEMENT',
-        isTitle: true,
-    },
-    {
-        key: 'data-import',
-        icon: 'iconamoon:cloud-download-duotone',
-        label: 'Data Import',
-        children: [
-            {
-                key: 'import-teams',
-                label: 'Import Teams',
-                url: '/data/import/teams',
-                parentKey: 'data-import',
-            },
-            {
-                key: 'import-players',
-                label: 'Import Players',
-                url: '/data/import/players',
-                parentKey: 'data-import',
-            },
-            {
-                key: 'import-games',
-                label: 'Import Games',
-                url: '/data/import/games',
-                parentKey: 'data-import',
-            },
-            {
-                key: 'import-plays',
-                label: 'Import Plays',
-                url: '/data/import/plays',
-                parentKey: 'data-import',
-            },
-        ],
-    },
-    {
-        key: 'analytics',
+        key: 'analytics-reports',
         label: 'ANALYTICS',
         isTitle: true,
+    },
+    {
+        key: 'predictions',
+        icon: 'iconamoon:crystal-ball-duotone',
+        label: 'Prediction Engine',
+        url: '/reports/predictions',
+    },
+    {
+        key: 'prop-scanner',
+        icon: 'iconamoon:radar-duotone',
+        label: 'Prop Scanner',
+        url: '/advanced/prop-scanner',
     },
     {
         key: 'reports',
@@ -83,48 +64,97 @@ export const MENU_ITEMS: MenuItemType[] = [
         label: 'Reports',
         children: [
             {
-                key: 'team-reports',
-                label: 'Team Reports',
-                url: '/reports/teams',
-                parentKey: 'reports',
-            },
-            {
                 key: 'player-reports',
                 label: 'Player Reports',
                 url: '/reports/players',
                 parentKey: 'reports',
             },
             {
-                key: 'game-reports',
-                label: 'Game Reports',
-                url: '/reports/games',
+                key: 'team-reports',
+                label: 'Team Reports',
+                url: '/reports/teams',
+                parentKey: 'reports',
+            },
+            {
+                key: 'model-validation-reports',
+                label: 'Model Validation',
+                url: '/reports/analytics',
                 parentKey: 'reports',
             },
         ],
     },
     {
-        key: 'advanced-stats',
+        key: 'advanced-tools',
+        label: 'ADVANCED',
+        isTitle: true,
+    },
+    {
+        key: 'advanced',
         icon: 'iconamoon:3d-duotone',
-        label: 'Advanced Stats',
+        label: 'Advanced Analytics',
         children: [
             {
-                key: 'efficiency-ratings',
-                label: 'Efficiency Ratings',
-                url: '/advanced/efficiency',
-                parentKey: 'advanced-stats',
+                key: 'advanced-overview',
+                label: 'Analytics Overview',
+                url: '/advanced',
+                parentKey: 'advanced',
             },
             {
-                key: 'shot-charts',
-                label: 'Shot Charts',
-                url: '/advanced/shot-charts',
-                parentKey: 'advanced-stats',
+                key: 'monte-carlo',
+                label: 'Monte Carlo Simulations',
+                url: '/advanced/monte-carlo',
+                parentKey: 'advanced',
             },
             {
-                key: 'play-analysis',
-                label: 'Play Analysis',
-                url: '/advanced/play-analysis',
-                parentKey: 'advanced-stats',
+                key: 'model-validation',
+                label: 'Model Validation',
+                url: '/advanced/model-validation',
+                parentKey: 'advanced',
+            },
+            {
+                key: 'prediction-testing',
+                label: 'Historical Testing',
+                url: '/advanced/prediction-testing',
+                parentKey: 'advanced',
+            },
+            {
+                key: 'betting-analytics',
+                label: 'Betting Analytics',
+                url: '/advanced/betting-analytics',
+                parentKey: 'advanced',
+            },
+            {
+                key: 'data-quality',
+                label: 'Data Quality',
+                url: '/advanced/data-quality',
+                parentKey: 'advanced',
+            },
+        ],
+    },
+    {
+        key: 'methodology',
+        icon: 'iconamoon:book-duotone',
+        label: 'Methodology',
+        children: [
+            {
+                key: 'methodology-overview',
+                label: 'Overview',
+                url: '/methodology',
+                parentKey: 'methodology',
+            },
+            {
+                key: 'prop-analysis',
+                label: 'Prop Betting Analysis',
+                url: '/methodology/prop-analysis',
+                parentKey: 'methodology',
+            },
+            {
+                key: 'monte-carlo-methodology',
+                label: 'Monte Carlo Simulations',
+                url: '/methodology/monte-carlo',
+                parentKey: 'methodology',
             },
         ],
     },
 ];
+

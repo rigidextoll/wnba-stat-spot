@@ -32,10 +32,16 @@ class Main extends Controller
     }
 
     public function main() {
-        $this->loadAllData();
-        $this->saveAllData();
-        $data = $this->wnbaTeamData . $this->wnbaTeamScheduleData . $this->wnbaPbpData; // TODO: remove this after testing
-        return view('main', compact('data'));
+        // For now, just return the SPA view without loading data
+        // Data loading can be triggered separately via API endpoints
+        return view('app');
     }
 
+    public function loadData() {
+        // Separate endpoint for data loading
+        $this->loadAllData();
+        $this->saveAllData();
+
+        return response()->json(['message' => 'Data loaded successfully']);
+    }
 }

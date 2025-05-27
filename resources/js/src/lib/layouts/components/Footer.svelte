@@ -9,8 +9,7 @@
         <Row>
             <Col class="text-center">
                 {currentYear}
-                &copy; Reback. Crafted by
-                <Icon icon="iconamoon:heart-duotone" class="fs-18 align-middle text-danger"/>
+                &copy; 360 Web Solutions. Developed by
                 <a href={developedByLink} class="fw-bold footer-text" target="_blank">{developedBy}</a>
             </Col>
         </Row>

@@ -20,6 +20,7 @@
     let loading = true;
     let error: string | null = null;
     let searchTerm = '';
+    let viewMode: 'cards' | 'table' = 'cards';
 
     $: filteredPlayers = players.filter(player =>
         player.athlete_display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -28,7 +29,7 @@
 
     onMount(async () => {
         try {
-            const response = await api.players.getAll();
+            const response = await api.players.getAll({ per_page: 200 });
             players = response.data;
         } catch (e) {
             error = e instanceof Error ? e.message : 'An error occurred';
@@ -53,9 +54,9 @@
             </div>
         </div>
 
-        <!-- Search Bar -->
+        <!-- Controls -->
         <div class="row mb-3">
-            <div class="col-12">
+            <div class="col-md-8">
                 <div class="card">
                     <div class="card-body">
                         <div class="input-group">
@@ -68,6 +69,28 @@
                                 placeholder="Search players by name or position..."
                                 bind:value={searchTerm}
                             />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="btn-group w-100" role="group">
+                            <button
+                                type="button"
+                                class="btn {viewMode === 'cards' ? 'btn-success' : 'btn-outline-success'}"
+                                on:click={() => viewMode = 'cards'}
+                            >
+                                <i class="fas fa-th-large me-1"></i>Cards
+                            </button>
+                            <button
+                                type="button"
+                                class="btn {viewMode === 'table' ? 'btn-success' : 'btn-outline-success'}"
+                                on:click={() => viewMode = 'table'}
+                            >
+                                <i class="fas fa-table me-1"></i>Table
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -95,7 +118,85 @@
                     </div>
                 </div>
             </div>
+        {:else if viewMode === 'table'}
+            <!-- Table View -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Players ({filteredPlayers.length})</h5>
+                        </div>
+                        <div class="card-body">
+                            {#if filteredPlayers.length > 0}
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Player</th>
+                                                <th>Position</th>
+                                                <th>Jersey</th>
+                                                <th>Athlete ID</th>
+                                                <th class="text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each filteredPlayers as player}
+                                                <tr>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="avatar-xs bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                                {#if player.athlete_headshot_href}
+                                                                    <img src={player.athlete_headshot_href} alt={player.athlete_display_name} class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover;" />
+                                                                {:else}
+                                                                    <i class="fas fa-user text-success fs-12"></i>
+                                                                {/if}
+                                                            </div>
+                                                            <div>
+                                                                <div class="fw-semibold">{player.athlete_display_name}</div>
+                                                                <small class="text-muted">{player.athlete_short_name}</small>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-info">{player.athlete_position_abbreviation || 'N/A'}</span>
+                                                        {#if player.athlete_position_name}
+                                                            <br><small class="text-muted">{player.athlete_position_name}</small>
+                                                        {/if}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">#{player.athlete_jersey || 'N/A'}</span>
+                                                    </td>
+                                                    <td>
+                                                        <small class="text-muted">{player.athlete_id}</small>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a href="/players/{player.athlete_id}/analytics" class="btn btn-success btn-sm me-1">
+                                                            <i class="fas fa-chart-line"></i>
+                                                        </a>
+                                                        <a href="/players/{player.athlete_id}" class="btn btn-outline-success btn-sm">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {:else}
+                                <div class="text-center py-4">
+                                    <div class="avatar-lg bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3">
+                                        <i class="fas fa-search text-muted fs-24"></i>
+                                    </div>
+                                    <h5 class="mb-2">No Players Found</h5>
+                                    <p class="text-muted mb-0">No players match your search criteria.</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            </div>
         {:else}
+            <!-- Card View -->
             <div class="row">
                 {#each filteredPlayers as player}
                     <div class="col-xl-3 col-md-6 mb-4">
@@ -130,10 +231,23 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-3">
-                                    <a href="/players/{player.athlete_id}" class="btn btn-success btn-sm me-2">
-                                        View Details
-                                    </a>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-4">
+                                        <a href="/players/{player.athlete_id}/data" class="btn btn-success btn-sm">
+                                            <i class="fas fa-chart-line me-1"></i>
+                                            Data
+                                        </a>
+                                    </div>
+                                    <div class="col-4">
+                                        <a href="/players/{player.athlete_id}/analytics" class="btn btn-success btn-sm">
+                                            <i class="fas fa-chart-line me-1"></i>Advanced Analytics
+                                        </a>
+                                    </div>
+                                    <div class="col-4">
+                                        <a href="/players/{player.athlete_id}" class="btn btn-success btn-sm">
+                                            View Details
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
