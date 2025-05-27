@@ -50,7 +50,9 @@ RUN apk add --no-cache \
     freetype-dev \
     libjpeg-turbo-dev \
     libwebp-dev \
-    libxpm-dev
+    libxpm-dev \
+    net-tools \
+    procps
 
 # Create symlinks for PHP and set up PHP configuration
 RUN ln -sf /usr/bin/php82 /usr/bin/php \
@@ -68,6 +70,9 @@ COPY . .
 # Create Laravel directories if they don't exist
 RUN mkdir -p storage/logs storage/framework/cache storage/framework/sessions storage/framework/views \
     && mkdir -p bootstrap/cache
+
+# Create log directories for supervisord and services
+RUN mkdir -p /var/log/supervisor /var/log/nginx /var/run
 
 # Set PHP memory limit for Composer
 ENV COMPOSER_MEMORY_LIMIT=-1
