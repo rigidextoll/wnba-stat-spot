@@ -8,15 +8,29 @@ RUN npm ci
 COPY resources/js/ ./
 RUN npm run build
 
-# PHP/Laravel backend
-FROM php:8.4-fpm-alpine AS backend
+# PHP/Laravel backend with Node.js for SvelteKit
+FROM node:20-alpine AS backend
 
-# Install system dependencies
+# Install PHP and system dependencies
 RUN apk add --no-cache \
+    php82 \
+    php82-fpm \
+    php82-pdo \
+    php82-pdo_pgsql \
+    php82-mbstring \
+    php82-exif \
+    php82-pcntl \
+    php82-bcmath \
+    php82-gd \
+    php82-session \
+    php82-tokenizer \
+    php82-xml \
+    php82-ctype \
+    php82-json \
+    php82-fileinfo \
+    php82-openssl \
     git \
     curl \
-    libpng-dev \
-    libxml2-dev \
     zip \
     unzip \
     postgresql-dev \
@@ -28,9 +42,8 @@ RUN apk add --no-cache \
     libwebp-dev \
     libxpm-dev
 
-# Configure and install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
-    && docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
+# Create symlinks for PHP
+RUN ln -sf /usr/bin/php82 /usr/bin/php
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -47,8 +60,16 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 # Copy application code
 COPY . .
 
-# Copy built frontend assets (SvelteKit builds to build directory)
-COPY --from=frontend-builder /app/frontend/build ./public/build
+# Copy built frontend assets (SvelteKit Node.js build)
+COPY --from=frontend-builder /app/frontend/build ./frontend-build
+COPY --from=frontend-builder /app/frontend/package*.json ./frontend-build/
+
+# Install frontend production dependencies
+WORKDIR /var/www/html/frontend-build
+RUN npm ci --only=production
+
+# Back to main directory
+WORKDIR /var/www/html
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
