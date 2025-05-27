@@ -62,17 +62,17 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files first
-COPY composer.json composer.lock ./
+# Copy application code first (needed for artisan)
+COPY . .
 
 # Set PHP memory limit for Composer
 ENV COMPOSER_MEMORY_LIMIT=-1
 
-# Install PHP dependencies
-RUN php -v && composer --version && composer install --no-dev --optimize-autoloader --no-interaction --verbose
+# Install PHP dependencies (skip scripts to avoid artisan issues)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
-# Copy application code
-COPY . .
+# Run Laravel post-install scripts now that everything is in place
+RUN php artisan package:discover --ansi || true
 
 # Copy built frontend assets (SvelteKit Node.js build)
 COPY --from=frontend-builder /app/frontend/build ./frontend-build
