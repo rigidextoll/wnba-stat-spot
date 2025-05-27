@@ -11,11 +11,18 @@ done
 
 echo "✅ Database connection established"
 
+# Laravel optimizations
+echo "⚡ Optimizing Laravel application..."
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
 # Import WNBA data (includes migrations)
 echo "📊 Setting up database and importing WNBA data..."
 php artisan app:import-wnba-data
 
 echo "🎉 WNBA Stat Spot is ready!"
 
-# Start the main application
-exec "$@"
+# Start supervisord to manage nginx and php-fpm
+echo "🔧 Starting application services..."
+supervisord -c /etc/supervisor/conf.d/supervisord.conf
