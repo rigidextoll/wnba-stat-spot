@@ -59,23 +59,55 @@ class QueueHealthCheck extends Command
         }
     }
 
-    private function checkDatabaseConnection(): bool
+        private function checkDatabaseConnection(): bool
     {
         $this->info('📊 Checking database connection...');
 
         try {
+            $defaultConnection = config('database.default');
+            $this->line("  📋 Default connection: {$defaultConnection}");
+
+            // Check for SQLite misconfiguration
+            if ($defaultConnection === 'sqlite') {
+                $this->line('  ⚠️  WARNING: Using SQLite in production (should be PostgreSQL)');
+            }
+
             DB::connection()->getPdo();
             $this->line('  ✅ Database connection: OK');
 
             if ($this->option('verbose')) {
-                $this->line('    Connection: ' . config('database.default'));
-                $this->line('    Driver: ' . config('database.connections.' . config('database.default') . '.driver'));
+                $driver = config('database.connections.' . $defaultConnection . '.driver');
+                $this->line("    Driver: {$driver}");
+
+                // Show environment variables
+                $this->line('    Environment:');
+                $this->line('      DB_CONNECTION: ' . (env('DB_CONNECTION') ?: 'not_set'));
+                $this->line('      DB_HOST: ' . (env('DB_HOST') ?: 'not_set'));
+                $this->line('      DB_PORT: ' . (env('DB_PORT') ?: 'not_set'));
+                $this->line('      DB_DATABASE: ' . (env('DB_DATABASE') ?: 'not_set'));
+
+                // Test specific connections
+                if ($defaultConnection !== 'pgsql') {
+                    try {
+                        DB::connection('pgsql')->getPdo();
+                        $this->line('    ✅ PostgreSQL connection also works');
+                    } catch (\Exception $e) {
+                        $this->line('    ❌ PostgreSQL connection failed: ' . substr($e->getMessage(), 0, 100));
+                    }
+                }
             }
 
             return true;
         } catch (\Exception $e) {
             $this->line('  ❌ Database connection: FAILED');
             $this->line('    Error: ' . $e->getMessage());
+
+            // Additional debugging for SQLite errors
+            if (str_contains($e->getMessage(), 'database.sqlite')) {
+                $this->line('    🔍 This looks like a SQLite configuration issue');
+                $this->line('    💡 Check that DB_CONNECTION=pgsql in environment');
+            }
+
             return false;
         }
     }

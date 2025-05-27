@@ -8,6 +8,19 @@ cd /var/www/html
 # Function to check database connectivity
 check_database() {
     echo "🔍 Checking database connection..."
+
+    # First check the configuration
+    echo "📋 Database configuration:"
+    echo "  DB_CONNECTION: ${DB_CONNECTION:-not_set}"
+    echo "  DB_HOST: ${DB_HOST:-not_set}"
+    echo "  DB_PORT: ${DB_PORT:-not_set}"
+    echo "  DB_DATABASE: ${DB_DATABASE:-not_set}"
+
+    # Check what Laravel thinks the connection is
+    local laravel_connection=$(php artisan tinker --execute="echo config('database.default');" 2>/dev/null | tail -1)
+    echo "  Laravel default connection: ${laravel_connection:-unknown}"
+
+    # Test the actual connection
     php artisan migrate:status > /dev/null 2>&1
     return $?
 }
@@ -56,17 +69,23 @@ while [ $attempt -le $max_attempts ]; do
         break
     fi
 
-    if [ $attempt -eq $max_attempts ]; then
+        if [ $attempt -eq $max_attempts ]; then
         echo "❌ Database connection failed after $max_attempts attempts"
-        echo "🔍 Debugging database connection..."
-        echo "Environment variables:"
-        echo "DB_CONNECTION: ${DB_CONNECTION:-not_set}"
-        echo "DB_HOST: ${DB_HOST:-not_set}"
-        echo "DB_PORT: ${DB_PORT:-not_set}"
-        echo "DB_DATABASE: ${DB_DATABASE:-not_set}"
+        echo "🔍 Final debugging attempt..."
 
         echo "🔍 Testing basic connectivity..."
         php artisan tinker --execute="try { DB::connection()->getPdo(); echo 'DB Connected'; } catch(Exception \$e) { echo 'DB Error: ' . \$e->getMessage(); }" || echo "Tinker failed"
+
+        echo "🔍 Checking if SQLite file exists (should NOT exist for PostgreSQL)..."
+        if [ -f "/var/www/html/database/database.sqlite" ]; then
+            echo "⚠️  SQLite file exists - this suggests configuration issue"
+            ls -la /var/www/html/database/
+        else
+            echo "✅ No SQLite file found (good for PostgreSQL setup)"
+        fi
+
+        echo "🔍 Testing PostgreSQL connection directly..."
+        php artisan tinker --execute="try { DB::connection('pgsql')->getPdo(); echo 'PostgreSQL Connected'; } catch(Exception \$e) { echo 'PostgreSQL Error: ' . \$e->getMessage(); }" || echo "PostgreSQL test failed"
 
         exit 1
     fi

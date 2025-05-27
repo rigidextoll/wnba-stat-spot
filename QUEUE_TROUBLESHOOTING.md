@@ -39,7 +39,29 @@ tail -f storage/logs/laravel.log
 
 ## 🛠️ Common Issues & Fixes
 
-### Issue 1: Database Connection Problems
+### Issue 1: SQLite Configuration Error (MOST COMMON)
+**Symptoms:** 
+```
+Database file at path [/var/www/html/database/database.sqlite] does not exist
+```
+
+**Root Cause:** Laravel is defaulting to SQLite instead of PostgreSQL
+
+**Fix:**
+```bash
+# Run the database configuration fixer
+php artisan db:fix-config --force
+
+# Or manually check configuration
+php artisan queue:health-check --verbose
+```
+
+**What was fixed:**
+- Changed default database connection from `sqlite` to `pgsql` in config files
+- Updated queue batching and failed job configurations
+- Added better error detection and debugging
+
+### Issue 2: Database Connection Problems
 **Symptoms:** Queue worker exits immediately with database connection errors
 
 **Fix:**
@@ -47,7 +69,7 @@ tail -f storage/logs/laravel.log
 - Check database environment variables in Render dashboard
 - Verify PostgreSQL service is running
 
-### Issue 2: Missing Queue Tables
+### Issue 3: Missing Queue Tables
 **Symptoms:** Queue worker can't find `jobs`, `failed_jobs`, or `job_batches` tables
 
 **Fix:**
@@ -62,7 +84,7 @@ php artisan queue:batches-table
 php artisan migrate --force
 ```
 
-### Issue 3: Memory Issues
+### Issue 4: Memory Issues
 **Symptoms:** Queue worker exits due to memory exhaustion
 
 **Fix:**
@@ -70,7 +92,7 @@ php artisan migrate --force
 - Heavy jobs now have memory limits and timeouts
 - Queue worker restarts after processing 100 jobs
 
-### Issue 4: Long-Running Jobs
+### Issue 5: Long-Running Jobs
 **Symptoms:** Queue worker times out on heavy prediction jobs
 
 **Fix:**
@@ -107,6 +129,9 @@ php artisan queue:health-check
 
 # Detailed health check
 php artisan queue:health-check --verbose
+
+# Fix database configuration issues
+php artisan db:fix-config --force
 
 # Check pending jobs
 php artisan queue:monitor
