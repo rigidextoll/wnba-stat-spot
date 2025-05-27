@@ -2,7 +2,6 @@ services:
   - type: web
     name: wnba-stat-spot
     runtime: docker
-    repo: https://github.com/your-username/wnba-stat-spot.git
     dockerfilePath: ./Dockerfile
     envVars:
       - key: APP_ENV
@@ -34,11 +33,13 @@ services:
           name: wnba-database
           property: password
       - key: CACHE_DRIVER
-        value: redis
+        value: database
       - key: QUEUE_CONNECTION
         value: database
       - key: SESSION_DRIVER
         value: database
+      - key: APP_URL
+        value: https://wnba-stat-spot.onrender.com
 
 databases:
   - name: wnba-database
