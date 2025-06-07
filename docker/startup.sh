@@ -297,6 +297,16 @@ wait_for_database() {
             echo "🔍 Debugging environment configuration..."
             php artisan about || echo "⚠️  About command failed, continuing..."
 
+            # Clear Laravel caches if requested (for Redis cache issues)
+            if [ "$CLEAR_CACHE" = "true" ]; then
+                echo "🧹 Clearing Laravel caches (Redis configuration cache)..."
+                php artisan config:clear || echo "⚠️  Config cache clear failed"
+                php artisan cache:clear || echo "⚠️  Application cache clear failed"
+                php artisan route:clear || echo "⚠️  Route cache clear failed"
+                php artisan view:clear || echo "⚠️  View cache clear failed"
+                echo "✅ Cache clearing completed"
+            fi
+
             # Run database migrations first - CRITICAL FOR RAILWAY
             echo "📊 Running database migrations (FORCED)..."
             php artisan migrate --force || {
