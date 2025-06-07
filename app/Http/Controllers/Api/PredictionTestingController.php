@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class PredictionTestingController extends Controller
 {
@@ -396,17 +397,114 @@ class PredictionTestingController extends Controller
      */
     public function getHistoricalTests(Request $request): JsonResponse
     {
-        // This would typically come from a database table storing test results
-        // For now, return a placeholder structure
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'total_tests_run' => 0,
-                'average_accuracy' => 0,
-                'recent_tests' => [],
-                'accuracy_trends' => []
-            ]
-        ]);
+        try {
+            // Check if the table exists first
+            if (!Schema::hasTable('prediction_test_results')) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'total_tests_run' => 0,
+                        'average_accuracy' => 0,
+                        'recent_tests' => [],
+                        'accuracy_trends' => [],
+                        'message' => 'Historical testing system not yet initialized.'
+                    ]
+                ]);
+            }
+
+            // Get summary statistics
+            $totalTests = DB::table('prediction_test_results')->count();
+            $averageAccuracy = DB::table('prediction_test_results')->avg('accuracy_percentage') ?? 0;
+
+            // Get recent tests (last 50)
+            $recentTests = DB::table('prediction_test_results')
+                ->select([
+                    'player_name',
+                    'stat_type',
+                    'accuracy_percentage',
+                    'total_predictions',
+                    'correct_predictions',
+                    'tested_at',
+                    'test_batch_id'
+                ])
+                ->orderBy('tested_at', 'desc')
+                ->limit(50)
+                ->get()
+                ->map(function($test) {
+                    return [
+                        'player_name' => $test->player_name,
+                        'stat_type' => $test->stat_type,
+                        'accuracy' => round($test->accuracy_percentage, 1),
+                        'total_predictions' => $test->total_predictions,
+                        'correct_predictions' => $test->correct_predictions,
+                        'tested_at' => $test->tested_at,
+                        'test_batch_id' => $test->test_batch_id
+                    ];
+                });
+
+            // Get accuracy trends by stat type
+            $accuracyTrends = DB::table('prediction_test_results')
+                ->select([
+                    'stat_type',
+                    DB::raw('AVG(accuracy_percentage) as avg_accuracy'),
+                    DB::raw('COUNT(*) as test_count'),
+                    DB::raw('SUM(correct_predictions) as total_correct'),
+                    DB::raw('SUM(total_predictions) as total_predictions')
+                ])
+                ->groupBy('stat_type')
+                ->get()
+                ->map(function($trend) {
+                    return [
+                        'stat_type' => $trend->stat_type,
+                        'average_accuracy' => round($trend->avg_accuracy, 1),
+                        'test_count' => $trend->test_count,
+                        'total_correct' => $trend->total_correct,
+                        'total_predictions' => $trend->total_predictions
+                    ];
+                });
+
+            // Get top performing players
+            $topPerformers = DB::table('prediction_test_results')
+                ->select([
+                    'player_name',
+                    DB::raw('AVG(accuracy_percentage) as avg_accuracy'),
+                    DB::raw('COUNT(*) as test_count'),
+                    DB::raw('SUM(total_predictions) as total_predictions')
+                ])
+                ->groupBy('player_name')
+                ->having('test_count', '>=', 3) // At least 3 tests
+                ->orderBy('avg_accuracy', 'desc')
+                ->limit(10)
+                ->get()
+                ->map(function($performer) {
+                    return [
+                        'player_name' => $performer->player_name,
+                        'average_accuracy' => round($performer->avg_accuracy, 1),
+                        'test_count' => $performer->test_count,
+                        'total_predictions' => $performer->total_predictions
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total_tests_run' => $totalTests,
+                    'average_accuracy' => round($averageAccuracy, 1),
+                    'recent_tests' => $recentTests,
+                    'accuracy_trends' => $accuracyTrends,
+                    'top_performers' => $topPerformers,
+                    'last_updated' => now()->toISOString()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get historical tests: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to retrieve historical test data',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -551,7 +649,7 @@ class PredictionTestingController extends Controller
 
         try {
             // Check if the table exists first
-            if (!\Schema::hasTable('prediction_test_results')) {
+            if (!Schema::hasTable('prediction_test_results')) {
                 return response()->json([
                     'success' => true,
                     'data' => [
@@ -652,7 +750,7 @@ class PredictionTestingController extends Controller
     {
         try {
             // Check if the table exists first
-            if (!\Schema::hasTable('prediction_test_results')) {
+            if (!Schema::hasTable('prediction_test_results')) {
                 return response()->json([
                     'success' => true,
                     'data' => [
@@ -734,7 +832,7 @@ class PredictionTestingController extends Controller
 
         try {
             // Check if the table exists first
-            if (!\Schema::hasTable('prediction_test_results')) {
+            if (!Schema::hasTable('prediction_test_results')) {
                 return response()->json([
                     'success' => true,
                     'data' => [

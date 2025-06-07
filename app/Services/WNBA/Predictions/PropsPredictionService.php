@@ -38,6 +38,18 @@ class PropsPredictionService
     }
 
     /**
+     * Ensure value is positive and rounded to nearest .5 increment
+     */
+    private function ensurePositiveAndRoundToHalf(float $value): float
+    {
+        // Ensure positive value (minimum 0.5)
+        $positiveValue = max(0.5, abs($value));
+
+        // Round to nearest .5 increment
+        return round($positiveValue * 2) / 2;
+    }
+
+    /**
      * Main prediction method - returns full prediction object
      */
     public function predictProp(int $playerId, int $gameId, string $propType, float $lineValue): array
@@ -87,7 +99,7 @@ class PropsPredictionService
                     'category' => $this->getPropCategory($propType)
                 ],
                 'prediction' => [
-                    'predicted_value' => $prediction['predicted_value'],
+                    'predicted_value' => $this->ensurePositiveAndRoundToHalf($prediction['predicted_value']),
                     'over_probability' => $prediction['over_probability'],
                     'under_probability' => 1 - $prediction['over_probability'],
                     'confidence_score' => $confidence,
@@ -279,6 +291,65 @@ class PropsPredictionService
     public function predictPersonalFouls(int $playerId, int $gameId, float $lineValue = null): array
     {
         return $this->predictionEngine->predict('personal_fouls', $playerId, $gameId, $lineValue);
+    }
+
+    /**
+     * Get betting recommendation for a specific prop
+     */
+    public function getBettingRecommendation(int $playerId, string $statType, float $line, float $oddsOver, float $oddsUnder, ?int $gameId = null, ?int $season = null): array
+    {
+        // Use a default game ID if none provided
+        $gameId = $gameId ?? 1;
+
+        // Get prediction for this prop
+        $prediction = $this->predictionEngine->predict($statType, $playerId, $gameId, $line);
+
+        // Extract probabilities
+        $overProbability = $prediction['probabilities']['over'] ?? 0.5;
+        $underProbability = $prediction['probabilities']['under'] ?? 0.5;
+        $confidence = $prediction['prediction']['confidence'] ?? 0.5;
+
+        // Convert American odds to decimal
+        $overDecimal = $oddsOver > 0 ? ($oddsOver / 100) + 1 : (100 / abs($oddsOver)) + 1;
+        $underDecimal = $oddsUnder > 0 ? ($oddsUnder / 100) + 1 : (100 / abs($oddsUnder)) + 1;
+
+        // Calculate expected values
+        $overEV = ($overProbability * ($overDecimal - 1)) - ((1 - $overProbability) * 1);
+        $underEV = ($underProbability * ($underDecimal - 1)) - ((1 - $underProbability) * 1);
+
+        // Determine recommendation
+        $recommendation = 'avoid';
+        $bestBet = null;
+        $expectedValue = 0;
+
+        if ($confidence >= 0.6) {
+            if ($overEV > 0.05 && $overEV > $underEV) {
+                $recommendation = 'over';
+                $bestBet = 'over';
+                $expectedValue = $overEV;
+            } elseif ($underEV > 0.05 && $underEV > $overEV) {
+                $recommendation = 'under';
+                $bestBet = 'under';
+                $expectedValue = $underEV;
+            }
+        }
+
+        return [
+            'recommendation' => $recommendation,
+            'best_bet' => $bestBet,
+            'expected_value' => round($expectedValue, 3),
+            'over_ev' => round($overEV, 3),
+            'under_ev' => round($underEV, 3),
+            'confidence' => round($confidence, 3),
+            'probabilities' => [
+                'over' => round($overProbability, 3),
+                'under' => round($underProbability, 3)
+            ],
+            'odds' => [
+                'over' => $oddsOver,
+                'under' => $oddsUnder
+            ]
+        ];
     }
 
     /**

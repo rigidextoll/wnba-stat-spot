@@ -44,7 +44,7 @@ class PredictionEngine
                 }
 
                 // Get historical data
-                $historicalData = $this->dataAggregator->getPropData($playerId, $statType);
+                $historicalData = $this->dataAggregator->aggregatePropData($playerId, $statType);
 
                 // Get game context
                 $gameContext = $this->playerAnalytics->getGameContext($gameId, $playerId);
@@ -118,8 +118,11 @@ class PredictionEngine
             default => $distribution['mean'] ?? 0
         };
 
+        // Normalize base value to ensure positive and .5 increments
+        $normalizedBaseValue = $this->normalizeBaseValue($baseValue);
+
         return [
-            'value' => $baseValue,
+            'value' => $normalizedBaseValue,
             'distribution_type' => $distributionType,
             'confidence' => $this->calculateBaseConfidence($distribution),
             'distribution' => $distribution
@@ -143,12 +146,35 @@ class PredictionEngine
             $adjustedValue *= $adjustment['factor'];
         }
 
+        // Ensure positive value and round to .5 increments
+        $adjustedValue = $this->ensurePositiveAndRoundToHalf($adjustedValue);
+
         return [
             'value' => $adjustedValue,
             'confidence' => $this->calculateAdjustedConfidence($basePrediction['confidence'], $adjustments),
             'distribution' => $this->adjustDistribution($basePrediction['distribution'], $adjustments),
             'adjustments' => $adjustments
         ];
+    }
+
+    /**
+     * Ensure value is positive and rounded to nearest .5 increment
+     */
+    private function ensurePositiveAndRoundToHalf(float $value): float
+    {
+        // Ensure positive value (minimum 0.5)
+        $positiveValue = max(0.5, abs($value));
+
+        // Round to nearest .5 increment
+        return round($positiveValue * 2) / 2;
+    }
+
+    /**
+     * Apply positive and .5 rounding to base prediction values
+     */
+    private function normalizeBaseValue(float $value): float
+    {
+        return $this->ensurePositiveAndRoundToHalf($value);
     }
 
     /**
@@ -184,17 +210,20 @@ class PredictionEngine
 
     private function calculatePoissonBase(array $distribution): float
     {
-        return $distribution['mean'] ?? 0;
+        $value = $distribution['mean'] ?? 0;
+        return $this->normalizeBaseValue($value);
     }
 
     private function calculateNormalBase(array $distribution): float
     {
-        return $distribution['mean'] ?? 0;
+        $value = $distribution['mean'] ?? 0;
+        return $this->normalizeBaseValue($value);
     }
 
     private function calculateBinomialBase(array $distribution): float
     {
-        return $distribution['mean'] ?? 0;
+        $value = $distribution['mean'] ?? 0;
+        return $this->normalizeBaseValue($value);
     }
 
     private function calculateBaseConfidence(array $distribution): float
@@ -269,10 +298,12 @@ class PredictionEngine
         $adjustmentFactor = array_product(array_map(fn($adj) => $adj['factor'], $adjustments));
 
         if (isset($adjustedDistribution['mean'])) {
-            $adjustedDistribution['mean'] *= $adjustmentFactor;
+            $adjustedMean = $adjustedDistribution['mean'] * $adjustmentFactor;
+            $adjustedDistribution['mean'] = $this->ensurePositiveAndRoundToHalf($adjustedMean);
         }
         if (isset($adjustedDistribution['median'])) {
-            $adjustedDistribution['median'] *= $adjustmentFactor;
+            $adjustedMedian = $adjustedDistribution['median'] * $adjustmentFactor;
+            $adjustedDistribution['median'] = $this->ensurePositiveAndRoundToHalf($adjustedMedian);
         }
 
         return $adjustedDistribution;

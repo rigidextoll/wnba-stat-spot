@@ -121,9 +121,9 @@
 
             for (const statType of statTypes) {
                 try {
-                    // Use the same prediction endpoint as quick predictions
+                    // Use the same prediction endpoint as quick predictions with odds integration
                     const response = await api.wnba.predictions.generatePrediction({
-                        player_id: playerId,
+                        player_id: player?.athlete_id || playerId, // Use athlete_id if available
                         stat: statType,
                         line: getDefaultLine(statType)
                     });
@@ -133,22 +133,28 @@
 
                         // Convert to PropScannerBet format for consistency
                         predictions.push({
-                            player_id: playerId,
+                            player_id: player?.athlete_id || playerId, // Use athlete_id if available
                             player_name: player?.athlete_display_name || 'Unknown',
                             player_position: player?.athlete_position_abbreviation || 'N/A',
                             stat_type: statType,
-                            suggested_line: getDefaultLine(statType),
+                            suggested_line: data.line || getDefaultLine(statType), // Use actual line from odds API
+                            original_line: getDefaultLine(statType), // Keep original for reference
                             predicted_value: data.predicted_value || getDefaultLine(statType),
                             confidence: data.confidence || 0.75,
                             probability_over: data.probability_over || 0.5,
                             probability_under: data.probability_under || 0.5,
                             expected_value: data.expected_value || 0,
                             recommendation: data.recommendation as 'over' | 'under' | 'avoid' || 'avoid',
-                            recent_form: parseFloat(averages?.points || '0') || 0,
-                            season_average: parseFloat(getStatFromAverages(averages, statType) || '0') || 0,
+                            // Use cached prediction data instead of frontend averages
+                            recent_form: data.predicted_value || parseFloat(getStatFromAverages(averages, statType) || '0') || 0,
+                            season_average: data.predicted_value || parseFloat(getStatFromAverages(averages, statType) || '0') || 0,
                             matchup_difficulty: 'Average',
                             injury_risk: 'Low',
                             betting_value: getValueRating(data.expected_value || 0),
+                            reasoning: data.reasoning || 'Based on cached prediction engine with odds data',
+                            data_source: data.data_source || 'cached_prediction_engine_with_odds',
+                            line_source: data.line_source || 'estimated',
+                            odds_data: data.odds_data || {},
                             created_at: new Date().toISOString()
                         });
                     }
@@ -194,7 +200,7 @@
     function generateFallbackPropBet(statType: string): PropScannerBet {
         const line = getDefaultLine(statType);
         return {
-            player_id: playerId,
+            player_id: player?.athlete_id || playerId, // Use athlete_id if available
             player_name: player?.athlete_display_name || 'Unknown',
             player_position: player?.athlete_position_abbreviation || 'N/A',
             stat_type: statType,
@@ -284,8 +290,9 @@
             historicalTestLoading = true;
             historicalTestError = '';
 
+            // Use athlete_id instead of database id for historical testing API
             const params: any = {
-                player_id: playerId,
+                player_id: player?.athlete_id || playerId, // Use athlete_id if available, fallback to playerId
                 limit: 50,
                 sort_by: testFilters.sort_by,
                 sort_order: testFilters.sort_order
@@ -299,17 +306,26 @@
                 params.min_accuracy = testFilters.min_accuracy;
             }
 
+            console.log('🔍 Loading historical test results with params:', params);
+            console.log('🔍 Player object:', player);
+            console.log('🔍 PlayerId from route:', playerId);
+
             const response = await api.wnba.testing.getHistoricalResults(params);
 
+            console.log('🔍 Historical test response:', response);
+
             if (response.success) {
-                historicalTestResults = response.data.results;
+                // The API returns data in response.data.results, not response.data
+                historicalTestResults = response.data?.results || [];
+                console.log('🔍 Historical test results loaded:', historicalTestResults.length, 'results');
             } else {
                 historicalTestError = 'Failed to load historical test results';
+                console.error('❌ API returned success=false:', response);
             }
 
         } catch (err) {
             historicalTestError = err instanceof Error ? err.message : 'Failed to load historical test results';
-            console.error('Error loading historical test results:', err);
+            console.error('❌ Error loading historical test results:', err);
         } finally {
             historicalTestLoading = false;
         }
@@ -620,81 +636,14 @@
                 </div>
             </div>
 
-            <!-- Prediction Engine -->
+            <!-- Quick Prediction Engine -->
             <div class="row mb-4" id="prediction-engine">
                 <div class="col-12">
                     <PredictionEngine
-                        playerId={player.athlete_id}
-                        playerName={player.athlete_display_name}
+                        bind:this={predictionEngineRef}
+                        playerId={playerId}
+                        playerName={player?.athlete_display_name || 'Unknown Player'}
                     />
-                </div>
-            </div>
-
-            <!-- Game Log -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Game Log</h5>
-                        </div>
-                        <div class="card-body">
-                            {#if gameStats.length > 0}
-                                <div class="table-responsive">
-                                    <table class="table table-striped table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Team</th>
-                                                <th>MIN</th>
-                                                <th>PTS</th>
-                                                <th>REB</th>
-                                                <th>AST</th>
-                                                <th>STL</th>
-                                                <th>BLK</th>
-                                                <th>FG</th>
-                                                <th>3PT</th>
-                                                <th>FT</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {#each gameStats.slice(0, 20) as game}
-                                                <tr>
-                                                    <td>
-                                                        <small>{new Date(game.game?.game_date || '').toLocaleDateString()}</small>
-                                                    </td>
-                                                    <td>
-                                                        <div class="d-flex align-items-center">
-                                                            {#if game.team?.team_logo}
-                                                                <img src={game.team.team_logo} alt={game.team.team_abbreviation} style="width: 20px; height: 20px; object-fit: contain;" class="me-2" />
-                                                            {/if}
-                                                            <small>{game.team?.team_abbreviation || 'N/A'}</small>
-                                                        </div>
-                                                    </td>
-                                                    <td><small>{game.minutes || '0:00'}</small></td>
-                                                    <td><strong>{game.points}</strong></td>
-                                                    <td>{game.rebounds}</td>
-                                                    <td>{game.assists}</td>
-                                                    <td>{game.steals}</td>
-                                                    <td>{game.blocks}</td>
-                                                    <td><small>{game.field_goals_made}/{game.field_goals_attempted}</small></td>
-                                                    <td><small>{game.three_point_field_goals_made}/{game.three_point_field_goals_attempted}</small></td>
-                                                    <td><small>{game.free_throws_made}/{game.free_throws_attempted}</small></td>
-                                                </tr>
-                                            {/each}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {:else}
-                                <div class="text-center py-4">
-                                    <div class="avatar-lg bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3">
-                                        <i class="fas fa-chart-bar text-muted fs-24"></i>
-                                    </div>
-                                    <h5 class="mb-2">No Game Stats</h5>
-                                    <p class="text-muted mb-0">This player has no recorded game statistics.</p>
-                                </div>
-                            {/if}
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -705,7 +654,7 @@
                         <div class="card-header">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h5 class="card-title mb-0">
-                                    <i class="fas fa-search-dollar text-primary me-2"></i>Prop Betting Opportunities based on averages
+                                    <i class="fas fa-search-dollar text-primary me-2"></i>Prop Betting Opportunities (Cached Prediction Engine)
                                 </h5>
                                 <button
                                     on:click={loadPropScannerData}
@@ -747,16 +696,16 @@
                                             <tr>
                                                 <th>Stat</th>
                                                 <th>Line</th>
+                                                <th>Line Source</th>
                                                 <th>Predicted</th>
                                                 <th>Confidence</th>
                                                 <th>Recommendation</th>
                                                 <th>Expected Value</th>
                                                 <th>Over Prob</th>
                                                 <th>Under Prob</th>
+                                                <th>Odds Info</th>
                                                 <th>Recent Form</th>
                                                 <th>Season Avg</th>
-                                                <th>Matchup</th>
-                                                <th>Injury Risk</th>
                                                 <th>Betting Value</th>
                                             </tr>
                                         </thead>
@@ -764,7 +713,12 @@
                                             {#each propScannerData as bet}
                                                 <tr>
                                                     <td class="fw-medium text-capitalize">{bet.stat_type.replace('_', ' ')}</td>
-                                                    <td>{bet.suggested_line}</td>
+                                                    <td class="fw-medium">{bet.suggested_line}</td>
+                                                    <td>
+                                                        <span class="badge bg-{bet.line_source === 'odds_api' ? 'success' : 'warning'}-subtle text-{bet.line_source === 'odds_api' ? 'success' : 'warning'}">
+                                                            {bet.line_source === 'odds_api' ? 'Real Odds' : 'Estimated'}
+                                                        </span>
+                                                    </td>
                                                     <td class="fw-medium">{bet.predicted_value.toFixed(1)}</td>
                                                     <td>
                                                         <span class="badge bg-{bet.confidence >= 0.8 ? 'success' : bet.confidence >= 0.6 ? 'warning' : 'danger'}-subtle text-{bet.confidence >= 0.8 ? 'success' : bet.confidence >= 0.6 ? 'warning' : 'danger'}">
@@ -781,18 +735,21 @@
                                                     </td>
                                                     <td>{formatPercentage(bet.probability_over)}</td>
                                                     <td>{formatPercentage(bet.probability_under)}</td>
+                                                    <td>
+                                                        {#if bet.odds_data && bet.odds_data.available}
+                                                            <div class="small">
+                                                                <div>O: {bet.odds_data.over_odds > 0 ? '+' : ''}{bet.odds_data.over_odds}</div>
+                                                                <div>U: {bet.odds_data.under_odds > 0 ? '+' : ''}{bet.odds_data.under_odds}</div>
+                                                                {#if bet.odds_data.bookmaker_over && bet.odds_data.bookmaker_over !== 'Unknown'}
+                                                                    <div class="text-muted">{bet.odds_data.bookmaker_over}</div>
+                                                                {/if}
+                                                            </div>
+                                                        {:else}
+                                                            <span class="text-muted small">No odds</span>
+                                                        {/if}
+                                                    </td>
                                                     <td>{bet.recent_form}</td>
                                                     <td>{bet.season_average}</td>
-                                                    <td>
-                                                        <span class="badge bg-{getMatchupDifficultyColor(bet.matchup_difficulty)}-subtle text-{getMatchupDifficultyColor(bet.matchup_difficulty)} text-capitalize">
-                                                            {bet.matchup_difficulty}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-{getInjuryRiskColor(bet.injury_risk)}-subtle text-{getInjuryRiskColor(bet.injury_risk)} text-capitalize">
-                                                            {bet.injury_risk}
-                                                        </span>
-                                                    </td>
                                                     <td>
                                                         <span class="badge bg-{getBettingValueColor(bet.betting_value)}-subtle text-{getBettingValueColor(bet.betting_value)} text-capitalize">
                                                             {bet.betting_value}
@@ -802,6 +759,20 @@
                                             {/each}
                                         </tbody>
                                     </table>
+                                </div>
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Predictions generated using cached prediction engine with real betting lines from The Odds API
+                                        {#if propScannerData.length > 0}
+                                            • Data source: {propScannerData[0].data_source}
+                                            {#if propScannerData.some(bet => bet.line_source === 'odds_api')}
+                                                • <span class="text-success">Real sportsbook lines detected</span>
+                                            {:else}
+                                                • <span class="text-warning">Using estimated lines (no real odds available)</span>
+                                            {/if}
+                                        {/if}
+                                    </small>
                                 </div>
                             {:else}
                                 <div class="text-center py-4">

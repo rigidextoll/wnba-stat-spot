@@ -54,13 +54,13 @@ class WnbaPredictionsController extends Controller
 
             // Get prediction based on stat type
             $prediction = match($statType) {
-                'points' => $this->predictionService->predictPoints($playerId, $gameId, $season, $simulationRuns),
-                'rebounds' => $this->predictionService->predictRebounds($playerId, $gameId, $season, $simulationRuns),
-                'assists' => $this->predictionService->predictAssists($playerId, $gameId, $season, $simulationRuns),
-                'steals' => $this->predictionService->predictStealsBlocks($playerId, 'steals', $gameId, $season, $simulationRuns),
-                'blocks' => $this->predictionService->predictStealsBlocks($playerId, 'blocks', $gameId, $season, $simulationRuns),
-                'three_pointers' => $this->predictionService->predictThreePointers($playerId, $gameId, $season, $simulationRuns),
-                'minutes' => $this->predictionService->predictMinutes($playerId, $gameId, $season, $simulationRuns),
+                'points' => $this->predictionService->predictPoints($playerId, $gameId ?? 1),
+                'rebounds' => $this->predictionService->predictRebounds($playerId, $gameId ?? 1),
+                'assists' => $this->predictionService->predictAssists($playerId, $gameId ?? 1),
+                'steals' => $this->predictionService->predictSteals($playerId, $gameId ?? 1),
+                'blocks' => $this->predictionService->predictBlocks($playerId, $gameId ?? 1),
+                'three_pointers' => $this->predictionService->predictThreePointersMade($playerId, $gameId ?? 1),
+                'minutes' => $this->predictionService->predictMinutesPlayed($playerId, $gameId ?? 1),
                 default => throw new \InvalidArgumentException("Unsupported stat type: {$statType}")
             };
 
@@ -713,13 +713,16 @@ class WnbaPredictionsController extends Controller
 
             try {
                 $prediction = match($statType) {
-                    'points' => $this->predictionService->predictPoints($player->id, $mockGameId),
-                    'rebounds' => $this->predictionService->predictRebounds($player->id, $mockGameId),
-                    'assists' => $this->predictionService->predictAssists($player->id, $mockGameId),
-                    'steals' => $this->predictionService->predictStealsBlocks($player->id, $mockGameId)['steals'] ?? [],
-                    'blocks' => $this->predictionService->predictStealsBlocks($player->id, $mockGameId)['blocks'] ?? [],
-                    'three_pointers' => $this->predictionService->predictThreePointers($player->id, $mockGameId),
-                    'minutes' => $this->predictionService->predictMinutes($player->id, $mockGameId),
+                    'points' => $this->predictionService->predictPoints($player->id, $mockGameId, $line),
+                    'rebounds' => $this->predictionService->predictRebounds($player->id, $mockGameId, $line),
+                    'assists' => $this->predictionService->predictAssists($player->id, $mockGameId, $line),
+                    'steals' => $this->predictionService->predictSteals($player->id, $mockGameId, $line),
+                    'blocks' => $this->predictionService->predictBlocks($player->id, $mockGameId, $line),
+                    'three_pointers_made' => $this->predictionService->predictThreePointersMade($player->id, $mockGameId, $line),
+                    'field_goals_made' => $this->predictionService->predictFieldGoalsMade($player->id, $mockGameId, $line),
+                    'free_throws_made' => $this->predictionService->predictFreeThrowsMade($player->id, $mockGameId, $line),
+                    'turnovers' => $this->predictionService->predictTurnovers($player->id, $mockGameId, $line),
+                    'minutes' => $this->predictionService->predictMinutesPlayed($player->id, $mockGameId, $line),
                     default => $this->generateDeterministicPrediction($player, $statType, $line)
                 };
             } catch (\Exception $e) {
@@ -727,11 +730,11 @@ class WnbaPredictionsController extends Controller
                 $prediction = $this->generateDeterministicPrediction($player, $statType, $line);
             }
 
-            // Calculate recommendation with proper logic
-            $predictedValue = $prediction['predicted_value'] ?? $line;
-            $confidence = $prediction['confidence'] ?? 0.75;
-            $overProbability = $prediction['over_probability'] ?? 0.5;
-            $underProbability = $prediction['under_probability'] ?? (1 - $overProbability);
+            // Extract values from prediction response structure
+            $predictedValue = $prediction['prediction']['adjusted_value'] ?? $prediction['predicted_value'] ?? $line;
+            $confidence = $prediction['prediction']['confidence'] ?? $prediction['confidence'] ?? 0.75;
+            $overProbability = $prediction['probabilities']['over'] ?? $prediction['over_probability'] ?? 0.5;
+            $underProbability = $prediction['probabilities']['under'] ?? $prediction['under_probability'] ?? (1 - $overProbability);
 
             // Calculate the difference between prediction and line
             $difference = $predictedValue - $line;

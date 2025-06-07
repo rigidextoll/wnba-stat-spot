@@ -31,8 +31,40 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
+// Utility function to get user timezone information
+export function getUserTimezone() {
+    if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const offsetHours = Math.floor(Math.abs(offset) / 60);
+        const offsetMinutes = Math.abs(offset) % 60;
+        const offsetSign = offset <= 0 ? '+' : '-';
+
+        return {
+            timezone,
+            offset,
+            offsetString: `UTC${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`,
+            localTime: now.toLocaleString(),
+            utcTime: now.toISOString(),
+            dateString: now.toLocaleDateString(),
+            timeString: now.toLocaleTimeString()
+        };
+    }
+
+    return {
+        timezone: 'UTC',
+        offset: 0,
+        offsetString: 'UTC+00:00',
+        localTime: new Date().toString(),
+        utcTime: new Date().toISOString(),
+        dateString: new Date().toLocaleDateString(),
+        timeString: new Date().toLocaleTimeString()
+    };
+}
+
 // Enhanced debug logging
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
     console.log('🔧 API Client Debug Info:', {
         browser,
         selectedURL: API_URL,
@@ -194,6 +226,7 @@ export interface Prediction {
     player_position?: string;
     stat: string;
     line: number;
+    original_line?: number;
     predicted_value: number;
     confidence: number;
     probability_over?: number;
@@ -201,6 +234,21 @@ export interface Prediction {
     recommendation: string;
     expected_value: number;
     reasoning?: string;
+    data_source?: string;
+    line_source?: string;
+    odds_data?: {
+        line?: number;
+        over_odds?: number;
+        under_odds?: number;
+        available?: boolean;
+        source?: string;
+        bookmaker_over?: string;
+        bookmaker_under?: string;
+        last_update?: string;
+        event_id?: string;
+        commence_time?: string;
+        total_bookmakers?: number;
+    };
     created_at: string;
 }
 
@@ -223,6 +271,7 @@ export interface PropScannerBet {
     player_position: string;
     stat_type: string;
     suggested_line: number;
+    original_line?: number;
     predicted_value: number;
     confidence: number;
     recommendation: 'over' | 'under' | 'avoid';
@@ -237,7 +286,48 @@ export interface PropScannerBet {
     injury_risk: string;
     betting_value: 'excellent' | 'good' | 'fair' | 'poor';
     reasoning?: string;
+    data_source?: string;
+    line_source?: string;
+    odds_data?: {
+        line?: number;
+        over_odds?: number;
+        under_odds?: number;
+        available?: boolean;
+        source?: string;
+        bookmaker_over?: string;
+        bookmaker_under?: string;
+        last_update?: string;
+        event_id?: string;
+        commence_time?: string;
+        total_bookmakers?: number;
+    };
     created_at?: string;
+}
+
+export interface TodaysProp {
+    player_id: string;
+    player_name: string;
+    team_abbreviation: string;
+    opponent: string;
+    game_time: string;
+    stat_type: string;
+    suggested_line: number;
+    predicted_value: number;
+    confidence: number;
+    recommendation: 'over' | 'under' | 'avoid';
+    expected_value: number;
+    probability_over: number;
+    probability_under: number;
+    recent_form: number;
+    season_average: number;
+    matchup_difficulty: string;
+    betting_value: 'excellent' | 'good' | 'fair' | 'poor';
+    reasoning: string;
+    espn_line?: number;
+    espn_odds?: {
+        over: number;
+        under: number;
+    };
 }
 
 // Data Aggregator Interfaces
@@ -523,21 +613,10 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit & { cacheTtl?
     const cacheKey = getCacheKey(url, options);
     const cacheTtl = options?.cacheTtl ? CACHE_TTL[options.cacheTtl] : CACHE_TTL.short;
 
-    // Enhanced debug logging for container networking issues
-    console.log('🌐 API Request Debug:', {
-        endpoint,
-        fullURL: url,
-        API_URL,
-        method: options?.method || 'GET',
-        timestamp: new Date().toISOString(),
-        hasBody: !!options?.body
-    });
-
     // Check cache for GET requests
     if (!options?.method || options.method === 'GET') {
         const cached = getFromCache(cacheKey);
         if (cached) {
-            console.log('📦 Returning cached data for:', url);
             return cached;
         }
     }
@@ -554,23 +633,13 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit & { cacheTtl?
     };
 
     try {
-        console.log('🚀 Making fetch request to:', url);
         const response = await fetch(url, config);
-
-        console.log('📡 Response received:', {
-            status: response.status,
-            statusText: response.statusText,
-            ok: response.ok,
-            url: response.url,
-            headers: Object.fromEntries(response.headers.entries())
-        });
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log('✅ Response data:', data);
 
         // Cache successful GET requests
         if (!options?.method || options.method === 'GET') {
@@ -580,22 +649,12 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit & { cacheTtl?
         return data;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const errorStack = error instanceof Error ? error.stack : undefined;
-        const errorType = error instanceof Error ? error.constructor.name : 'Unknown';
 
-        console.error('❌ API request failed:', {
-            url,
-            error: errorMessage,
-            stack: errorStack,
-            type: errorType
-        });
-
-        // Try to provide helpful error messages for common Docker issues
-        if (errorMessage.includes('ERR_INTERNET_DISCONNECTED') || errorMessage.includes('Failed to fetch')) {
-            console.error('🐳 Docker networking issue detected. Try these URLs in order:');
-            console.error('1. http://localhost:80/api/health');
-            console.error('2. http://host.docker.internal:80/api/health');
-            console.error('3. http://laravel.test:80/api/health');
+        if (import.meta.env.DEV) {
+            console.error('❌ API request failed:', {
+                url,
+                error: errorMessage
+            });
         }
 
         throw error;
@@ -606,12 +665,10 @@ export const api = {
     // Connection testing for Docker debugging
     test: {
         connection: async () => {
-            console.log('🔍 Testing API connections...');
             const results = [];
 
             for (const [name, url] of Object.entries(API_URLS)) {
                 try {
-                    console.log(`Testing ${name}: ${url}/health`);
                     const response = await fetch(`${url}/health`, {
                         method: 'GET',
                         headers: { 'Accept': 'application/json' }
@@ -626,7 +683,6 @@ export const api = {
                     };
 
                     results.push(result);
-                    console.log(`✅ ${name}:`, result);
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                     const result = {
@@ -637,7 +693,6 @@ export const api = {
                     };
 
                     results.push(result);
-                    console.log(`❌ ${name}:`, result);
                 }
             }
 
@@ -691,13 +746,38 @@ export const api = {
                     method: 'POST',
                     body: JSON.stringify(filters || {})
                 }),
-            generatePrediction: (params: { player_id: string; stat: string; line: number }) =>
+            generate: (data: { player_id: string; stat: string; line: number }) =>
                 fetchApi<{ success: boolean; data: Prediction }>('/wnba/predictions/generate', {
                     method: 'POST',
-                    body: JSON.stringify(params)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                    cacheTtl: 'medium'
+                }),
+            generatePrediction: (data: { player_id: string; stat: string; line: number }) =>
+                fetchApi<{ success: boolean; data: Prediction }>('/wnba/predictions/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                    cacheTtl: 'medium'
                 }),
             getPropBets: () =>
                 fetchApi<{ success: boolean; data: PropBet[] }>('/wnba/predictions/prop-bets', { cacheTtl: 'short' }),
+            getTodaysBest: (timezone?: string) => {
+                // Get user's timezone if not provided
+                const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const params = new URLSearchParams();
+                params.append('timezone', userTimezone);
+
+                return fetchApi<{ success: boolean; data: TodaysProp[] }>(`/wnba/predictions/todays-best?${params.toString()}`, { cacheTtl: 'short' });
+            },
+            getTodaysBestProps: (timezone?: string) => {
+                // Get user's timezone if not provided
+                const userTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const params = new URLSearchParams();
+                params.append('timezone', userTimezone);
+
+                return fetchApi<{ success: boolean; data: TodaysProp[] }>(`/wnba/predictions/todays-best?${params.toString()}`, { cacheTtl: 'short' });
+            },
         },
         analytics: {
             getPlayer: (playerId: string, options?: { season?: number; last_n_games?: number }) => {
@@ -761,136 +841,151 @@ export const api = {
         cache: {
             getStats: () => fetchApi<{ success: boolean; data: any }>('/wnba/cache/stats', { cacheTtl: 'short' }),
         },
-        data: {
-            // Player data aggregation
-            getPlayerData: async (playerId: string, options?: { season?: number; last_n_games?: number }): Promise<AggregatedPlayerData> => {
-                const params = new URLSearchParams();
-                if (options?.season) params.append('season', options.season.toString());
-                if (options?.last_n_games) params.append('last_n_games', options.last_n_games.toString());
 
-                const queryString = params.toString();
-                const endpoint = `/wnba/data/players/${playerId}${queryString ? `?${queryString}` : ''}`;
-
-                const response = await fetchApi<{ success: boolean; data: AggregatedPlayerData }>(endpoint, { cacheTtl: 'medium' });
-                return response.data;
-            },
-
-            // Player prop data
-            getPlayerPropData: async (playerId: string): Promise<AggregatedPlayerData> => {
-                const response = await fetchApi<{ success: boolean; data: AggregatedPlayerData }>(`/wnba/data/players/${playerId}/props`, { cacheTtl: 'short' });
-                return response.data;
-            },
-
-            // Team data aggregation
-            getTeamData: async (teamId: string, options?: { season?: number; last_n_games?: number }): Promise<AggregatedTeamData> => {
-                const params = new URLSearchParams();
-                if (options?.season) params.append('season', options.season.toString());
-                if (options?.last_n_games) params.append('last_n_games', options.last_n_games.toString());
-
-                const queryString = params.toString();
-                const endpoint = `/wnba/data/teams/${teamId}${queryString ? `?${queryString}` : ''}`;
-
-                const response = await fetchApi<{ success: boolean; data: AggregatedTeamData }>(endpoint, { cacheTtl: 'medium' });
-                return response.data;
-            },
-
-            // Game data aggregation
-            getGameData: async (gameId: string): Promise<AggregatedGameData> => {
-                const response = await fetchApi<{ success: boolean; data: AggregatedGameData }>(`/wnba/data/games/${gameId}`, { cacheTtl: 'medium' });
-                return response.data;
-            },
-
-            // Matchup data aggregation
-            getMatchupData: async (team1Id: string, team2Id: string, options?: { season?: number }): Promise<AggregatedMatchupData> => {
-                const params = new URLSearchParams();
-                if (options?.season) params.append('season', options.season.toString());
-
-                const queryString = params.toString();
-                const endpoint = `/wnba/data/matchups/${team1Id}/${team2Id}${queryString ? `?${queryString}` : ''}`;
-
-                const response = await fetchApi<{ success: boolean; data: AggregatedMatchupData }>(endpoint, { cacheTtl: 'medium' });
-                return response.data;
-            },
-
-            // League data aggregation
-            getLeagueData: async (season: number): Promise<AggregatedLeagueData> => {
-                const response = await fetchApi<{ success: boolean; data: AggregatedLeagueData }>(`/wnba/data/league/${season}`, { cacheTtl: 'long' });
-                return response.data;
-            }
-        },
+        // Testing & Validation API
         testing: {
-            testPlayerAccuracy: (params: {
-                player_id: string;
-                stat_type: string;
-                test_games?: number;
-                betting_lines?: number[];
-            }) => fetchApi<{ success: boolean; data: PredictionTestResult }>('/wnba/testing/player-accuracy', {
-                method: 'POST',
-                body: JSON.stringify(params)
-            }),
-            runBulkTesting: (params: {
-                player_ids: string[];
-                stat_type: string;
-                test_games?: number;
-            }) => fetchApi<{ success: boolean; data: BulkTestResult }>('/wnba/testing/bulk-testing', {
-                method: 'POST',
-                body: JSON.stringify(params)
-            }),
-            getHistoricalTests: () => fetchApi<{ success: boolean; data: any }>('/wnba/testing/historical', { cacheTtl: 'short' }),
+            testPlayerAccuracy: (params: { player_id: string; stat_type: string; test_games?: number; betting_lines?: number[] }) =>
+                fetchApi<{ success: boolean; data: PredictionTestResult }>('/wnba/testing/player-accuracy', {
+                    method: 'POST',
+                    body: JSON.stringify(params)
+                }),
 
-            // Historical Testing Methods
-            startHistoricalTesting: (params: HistoricalTestingParams) => fetchApi<{
-                success: boolean;
-                message: string;
-                data: {
-                    job_dispatched: boolean;
-                    estimated_duration: string;
-                    parameters: HistoricalTestingParams;
-                };
-            }>('/wnba/testing/historical/start', {
-                method: 'POST',
-                body: JSON.stringify(params)
-            }),
+            runBulkTesting: (params: { player_ids?: string[]; stat_types?: string[]; test_games?: number }) =>
+                fetchApi<{ success: boolean; data: BulkTestResult }>('/wnba/testing/bulk-testing', {
+                    method: 'POST',
+                    body: JSON.stringify(params)
+                }),
 
-            getHistoricalResults: (params?: HistoricalResultsParams) => fetchApi<{
-                success: boolean;
-                data: {
-                    results: HistoricalTestResult[];
-                    analytics: HistoricalTestAnalytics;
-                    filters_applied: HistoricalResultsParams;
-                };
-            }>('/wnba/testing/historical/results' + (params ? '?' + new URLSearchParams(params as any).toString() : ''), {
-                cacheTtl: 'short'
-            }),
+            getHistoricalTests: (params?: { limit?: number; offset?: number }) => {
+                const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+                return fetchApi<{ success: boolean; data: HistoricalTestResult[] }>(`/wnba/testing/historical${query}`, { cacheTtl: 'medium' });
+            },
 
-            getHistoricalTestingStatus: () => fetchApi<{
-                success: boolean;
-                data: HistoricalTestingStatus;
-            }>('/wnba/testing/historical/status', {
-                cacheTtl: 'short'
+            startHistoricalTesting: (params: HistoricalTestingParams) =>
+                fetchApi<{ success: boolean; data: any }>('/wnba/testing/historical/start', {
+                    method: 'POST',
+                    body: JSON.stringify(params)
+                }),
+
+            getHistoricalResults: (params?: HistoricalResultsParams) => {
+                const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+                return fetchApi<{ success: boolean; data: { results: HistoricalTestResult[]; analytics: HistoricalTestAnalytics; filters_applied: any } }>(`/wnba/testing/historical/results${query}`, { cacheTtl: 'medium' });
+            },
+
+            getHistoricalTestingStatus: () =>
+                fetchApi<{ success: boolean; data: HistoricalTestingStatus }>('/wnba/testing/historical/status', { cacheTtl: 'short' }),
+
+            getHistoricalLeaderboard: (params?: LeaderboardParams) => {
+                const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+                return fetchApi<{ success: boolean; data: HistoricalTestAnalytics }>(`/wnba/testing/historical/leaderboard${query}`, { cacheTtl: 'medium' });
+            },
+        },
+
+        // Data Import/Update API
+        dataImport: {
+            // Full import (incremental)
+            importAll: () => fetchApi<{ success: boolean; message: string; data: any }>('/wnba/data/import', {
+                method: 'POST'
             }),
 
-            getHistoricalLeaderboard: (params?: LeaderboardParams) => fetchApi<{
-                success: boolean;
-                data: {
-                    leaderboard: Array<{
-                        player_id: string;
-                        player_name: string;
-                        player_position: string | null;
-                        stat_type: string;
-                        avg_accuracy: number;
-                        best_accuracy: number;
-                        test_count: number;
-                        avg_sample_size: number;
-                        avg_confidence: number;
-                    }>;
-                    filters: LeaderboardParams;
-                };
-            }>('/wnba/testing/historical/leaderboard' + (params ? '?' + new URLSearchParams(params as any).toString() : ''), {
-                cacheTtl: 'short'
-            })
-        }
-    }
+            // Force import (overwrites existing)
+            forceImportAll: () => fetchApi<{ success: boolean; message: string; data: any }>('/wnba/data/import/force', {
+                method: 'POST'
+            }),
+
+            // Get import status
+            getStatus: () => fetchApi<{ success: boolean; data: any }>('/wnba/data/import/status'),
+
+            // Get data summary
+            getSummary: () => fetchApi<{ success: boolean; data: any }>('/wnba/data/stats/summary', { cacheTtl: 'short' }),
+
+            // Individual imports
+            importTeams: () => fetchApi<{ success: boolean; message: string; data: any }>('/wnba/data/import/teams', {
+                method: 'POST'
+            }),
+
+            importPlayers: () => fetchApi<{ success: boolean; message: string; data: any }>('/wnba/data/import/players', {
+                method: 'POST'
+            }),
+
+            importGames: () => fetchApi<{ success: boolean; message: string; data: any }>('/wnba/data/import/games', {
+                method: 'POST'
+            }),
+
+            importPlayerStats: () => fetchApi<{ success: boolean; message: string; data: any }>('/wnba/data/import/stats', {
+                method: 'POST'
+            }),
+        },
+    },
+    // The Odds API methods
+    odds: {
+        // Sports and Events
+        getSports: () => fetchApi<{ success: boolean; data: OddsApiSport[]; count: number }>('/odds/sports', { cacheTtl: 'long' }),
+        getWnbaOdds: (params?: any) => fetchApi<{ success: boolean; data: OddsApiEvent[]; count: number; filters: any }>(`/odds/wnba`, params),
+        getWnbaEvents: (params?: any) => fetchApi<{ success: boolean; data: OddsApiEvent[]; count: number }>(`/odds/wnba/events`, params),
+
+        // Player Props (based on The Odds API documentation)
+        getWnbaPlayerProps: (params?: {
+            markets?: string[] | string;
+            bookmakers?: string[] | string;
+            player_name?: string;
+            regions?: string;
+            oddsFormat?: string;
+        }) => {
+            const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+            return fetchApi<{ success: boolean; data: OddsApiPlayerProp[]; count: number; filters: any }>(`/odds/wnba/props${query}`, { cacheTtl: 'short' });
+        },
+
+        getPlayerPropMarkets: () => fetchApi<{ success: boolean; data: OddsApiPlayerProp[] }>('/odds/wnba/props/markets'),
+
+        getBestPlayerPropOdds: (params: {
+            player_name: string;
+            stat_type: string;
+            line?: number;
+        }) => {
+            const query = `?${new URLSearchParams(params as any).toString()}`;
+            return fetchApi<{ success: boolean; data: OddsApiPlayerProp }>(`/odds/wnba/props/best${query}`, { cacheTtl: 'short' });
+        },
+
+        getPlayerPropsAnalysis: (params: {
+            player_name: string;
+            markets?: string[] | string;
+        }) => {
+            const query = `?${new URLSearchParams(params as any).toString()}`;
+            return fetchApi<{ success: boolean; data: OddsApiPlayerProp[] }>(`/odds/wnba/props/analysis${query}`, { cacheTtl: 'short' });
+        },
+
+        getEventPlayerProps: (eventId: string, params?: {
+            markets?: string[] | string;
+            bookmakers?: string[] | string;
+            player_name?: string;
+            regions?: string;
+            oddsFormat?: string;
+        }) => {
+            const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+            return fetchApi<{ success: boolean; data: OddsApiPlayerProp[] }>(`/odds/wnba/events/${eventId}/props${query}`, { cacheTtl: 'short' });
+        },
+
+        // General Odds
+        getPlayerOdds: (params?: any) => {
+            const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+            return fetchApi<{ success: boolean; data: OddsApiPlayerProp | null }>(`/odds/player${query}`, { cacheTtl: 'short' });
+        },
+        getHistoricalOdds: (params?: any) => {
+            const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+            return fetchApi<{ success: boolean; data: OddsApiEvent[] }>(`/odds/historical${query}`, { cacheTtl: 'medium' });
+        },
+        getBestOdds: (params?: any) => {
+            const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+            return fetchApi<{ success: boolean; data: BestOddsComparison[] }>(`/odds/best${query}`, { cacheTtl: 'short' });
+        },
+        getLiveOdds: (params?: any) => {
+            const query = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+            return fetchApi<{ success: boolean; data: OddsApiEvent[] }>(`/odds/live${query}`, { cacheTtl: 'short' });
+        },
+        getUsageStats: () => fetchApi<{ success: boolean; data: OddsApiUsageStats }>('/odds/usage', { cacheTtl: 'short' }),
+        clearCache: () => fetchApi<{ success: boolean; message: string }>('/odds/clear-cache', { method: 'POST' }),
+    },
 };
 
 export interface PredictionTestResult {
@@ -1101,4 +1196,90 @@ export interface HistoricalResultsParams {
 export interface LeaderboardParams {
     stat_type?: string;
     limit?: number;
+}
+
+// The Odds API Interfaces
+export interface OddsApiSport {
+    key: string;
+    group: string;
+    title: string;
+    description: string;
+    active: boolean;
+    has_outrights: boolean;
+}
+
+export interface OddsApiEvent {
+    id: string;
+    sport_key: string;
+    sport_title: string;
+    commence_time: string;
+    home_team: string;
+    away_team: string;
+    bookmakers: OddsApiBookmaker[];
+}
+
+export interface OddsApiBookmaker {
+    key: string;
+    title: string;
+    last_update: string;
+    markets: OddsApiMarket[];
+}
+
+export interface OddsApiMarket {
+    key: string;
+    outcomes: OddsApiOutcome[];
+}
+
+export interface OddsApiOutcome {
+    name: string;
+    price: number;
+    point?: number;
+    description?: string;
+}
+
+export interface OddsApiPlayerProp {
+    player_name: string;
+    stat_type: string;
+    line: number;
+    event_id: string;
+    commence_time: string;
+    home_team: string;
+    away_team: string;
+    bookmakers: Array<{
+        bookmaker: string;
+        bookmaker_key: string;
+        name: string;
+        price: number;
+        point?: number;
+        last_update: string;
+    }>;
+}
+
+export interface OddsApiUsageStats {
+    requests_today: number;
+    requests_this_month: number;
+    monthly_limit: number;
+    daily_target: number;
+    monthly_usage_percent: number;
+    daily_usage_percent: number;
+    last_request: string | null;
+    can_make_request: boolean;
+    requests_remaining_today: number;
+    requests_remaining_month: number;
+    status: 'normal' | 'warning' | 'critical' | 'daily_limit_reached' | 'approaching_daily_limit';
+}
+
+export interface BestOddsComparison {
+    event_id: string;
+    home_team: string;
+    away_team: string;
+    commence_time: string;
+    player_name?: string;
+    stat_type?: string;
+    line?: number;
+    best_odds: Array<{
+        bookmaker: string;
+        odds: number;
+        last_update: string;
+    }>;
 }

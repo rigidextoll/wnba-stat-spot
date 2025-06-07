@@ -152,6 +152,53 @@ class GameAnalyticsService
         });
     }
 
+    /**
+     * Get comprehensive analytics for a game
+     */
+    public function getAnalytics(int $gameId): array
+    {
+        try {
+            return [
+                'game_id' => $gameId,
+                'basic_stats' => $this->getBasicStats($gameId),
+                'advanced_stats' => $this->getAdvancedStats($gameId),
+                'team_comparison' => $this->getTeamComparison($gameId),
+                'player_performances' => $this->getPlayerPerformances($gameId),
+                'key_moments' => $this->getKeyMoments($gameId),
+                'efficiency_metrics' => $this->getEfficiencyMetrics($gameId),
+                'pace_analysis' => $this->getPaceAnalysis($gameId),
+                'shooting_analysis' => $this->getShootingAnalysis($gameId),
+                'rebounding_analysis' => $this->getReboundingAnalysis($gameId),
+                'turnover_analysis' => $this->getTurnoverAnalysis($gameId),
+                'clutch_analysis' => $this->getClutchAnalysis($gameId),
+                'momentum_shifts' => $this->getMomentumShifts($gameId),
+                'referee_impact' => $this->getRefereeImpact($gameId),
+                'venue_factors' => $this->getVenueFactors($gameId)
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to get game analytics', [
+                'game_id' => $gameId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'game_id' => $gameId,
+                'error' => 'Failed to retrieve analytics',
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get basic game statistics
+     */
+    public function getBasicStats(int $gameId): array
+    {
+        // Implementation of getBasicStats method
+        // This method should return an array of basic game statistics
+        return [];
+    }
+
     // Private helper methods
 
     private function getGameInfo(WnbaGame $game): array

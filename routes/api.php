@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\BettingAnalyticsController;
 use App\Http\Controllers\Api\DataQualityController;
 use App\Http\Controllers\Api\PredictionTestingController;
 use App\Http\Controllers\Api\PredictionsController;
+use App\Http\Controllers\Api\OddsController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -128,9 +129,9 @@ Route::get('/status', function () {
 
 // Basic data endpoints
 Route::get('/teams', [TeamController::class, 'index']);
+Route::get('/teams/summary', [TeamController::class, 'summary']);
 Route::get('/teams/{teamId}', [TeamController::class, 'show']);
 Route::get('/teams/{teamId}/players', [TeamController::class, 'players']);
-Route::get('/teams/summary', [TeamController::class, 'summary']);
 Route::post('/teams/clear-cache', [TeamController::class, 'clearCache']);
 
 Route::get('/players', [PlayerController::class, 'index']);
@@ -143,14 +144,39 @@ Route::get('/stats', [StatsController::class, 'index']);
 
 // WNBA Analytics and Predictions API Routes
 Route::prefix('wnba')->group(function () {
-    // Predictions and Analytics
+    // Predictions
     Route::prefix('predictions')->group(function () {
+        Route::post('/generate', [PredictionsController::class, 'generatePrediction']);
+        Route::get('/prop-bets', [WnbaPredictionsController::class, 'getPropBets']);
+        Route::get('/todays-best', [PredictionsController::class, 'getTodaysBestProps']);
+    });
+
+    // Analytics
+    Route::prefix('analytics')->group(function () {
         Route::get('/player/{playerId}', [PredictionsController::class, 'getPlayerAnalytics']);
-        Route::post('/props', [PredictionsController::class, 'getPlayerPropPredictions']);
-        Route::post('/betting', [PredictionsController::class, 'getBettingRecommendations']);
         Route::get('/team/{teamId}', [PredictionsController::class, 'getTeamAnalytics']);
         Route::get('/game/{gameId}', [PredictionsController::class, 'getGameAnalytics']);
-        Route::post('/monte-carlo', [PredictionsController::class, 'runMonteCarloSimulation']);
+    });
+
+    // Data Import/Update Routes
+    Route::prefix('data')->group(function () {
+        Route::post('/import', [DataAggregatorController::class, 'importData']);
+        Route::post('/import/force', [DataAggregatorController::class, 'forceImportData']);
+        Route::get('/import/status', [DataAggregatorController::class, 'getImportStatus']);
+        Route::get('/stats/summary', [DataAggregatorController::class, 'getDataSummary']);
+
+        // Individual data type imports
+        Route::post('/import/teams', [DataAggregatorController::class, 'importTeams']);
+        Route::post('/import/players', [DataAggregatorController::class, 'importPlayers']);
+        Route::post('/import/games', [DataAggregatorController::class, 'importGames']);
+        Route::post('/import/stats', [DataAggregatorController::class, 'importPlayerStats']);
+
+        Route::get('/players/{playerId}', [DataAggregatorController::class, 'getPlayerData']);
+        Route::get('/players/{playerId}/props', [DataAggregatorController::class, 'getPropData']);
+        Route::get('/teams/{teamId}', [DataAggregatorController::class, 'getTeamData']);
+        Route::get('/games/{gameId}', [DataAggregatorController::class, 'getGameData']);
+        Route::get('/matchups/{team1Id}/{team2Id}', [DataAggregatorController::class, 'getMatchupData']);
+        Route::get('/league/{season}', [DataAggregatorController::class, 'getLeagueData']);
     });
 
     // Cache Management
@@ -162,19 +188,13 @@ Route::prefix('wnba')->group(function () {
 
     // Prop Scanner
     Route::prefix('prop-scanner')->group(function () {
+        Route::get('/scan-all', [PropScannerController::class, 'scanAll']);
+        Route::get('/scan-player/{playerId}', [PropScannerController::class, 'scanPlayer']);
+        Route::get('/player/{playerId}', [PropScannerController::class, 'scanPlayer']);
+        Route::get('/game/{gameId}', [PropScannerController::class, 'scanGame']);
         Route::post('/scan', [PropScannerController::class, 'scan']);
         Route::get('/results/{gameId}', [PropScannerController::class, 'getResults']);
         Route::get('/status/{gameId}', [PropScannerController::class, 'getStatus']);
-    });
-
-    // Data Aggregation
-    Route::prefix('data')->group(function () {
-        Route::get('/players/{playerId}', [DataAggregatorController::class, 'getPlayerData']);
-        Route::get('/players/{playerId}/props', [DataAggregatorController::class, 'getPropData']);
-        Route::get('/teams/{teamId}', [DataAggregatorController::class, 'getTeamData']);
-        Route::get('/games/{gameId}', [DataAggregatorController::class, 'getGameData']);
-        Route::get('/matchups/{team1Id}/{team2Id}', [DataAggregatorController::class, 'getMatchupData']);
-        Route::get('/league/{season}', [DataAggregatorController::class, 'getLeagueData']);
     });
 
     // Betting Analytics
@@ -197,4 +217,32 @@ Route::prefix('wnba')->group(function () {
         Route::get('/historical/status', [PredictionTestingController::class, 'getTestingStatus']);
         Route::get('/historical/leaderboard', [PredictionTestingController::class, 'getLeaderboard']);
     });
+});
+
+// The Odds API Routes
+Route::prefix('odds')->group(function () {
+    Route::get('/sports', [OddsController::class, 'getSports']);
+    Route::get('/wnba', [OddsController::class, 'getWnbaOdds']);
+    Route::get('/wnba/events', [OddsController::class, 'getWnbaEvents']);
+
+    // Configuration and Testing
+    Route::get('/test-config', [OddsController::class, 'testConfiguration']);
+
+    // Cache Management
+    Route::post('/clear-cache', [OddsController::class, 'clearCache']);
+    Route::get('/cache-status', [OddsController::class, 'getCacheStatus']);
+    Route::post('/force-refresh', [OddsController::class, 'forceRefresh']);
+
+    // Usage Statistics and Rate Limiting
+    Route::get('/usage', [OddsController::class, 'getUsageStats']);
+
+    // Live Odds (with aggressive caching)
+    Route::get('/live', [OddsController::class, 'getLiveOdds']);
+
+    // Player Props Routes (based on The Odds API documentation)
+    Route::get('/wnba/props', [OddsController::class, 'getWnbaPlayerProps']);
+    Route::get('/wnba/props/markets', [OddsController::class, 'getPlayerPropMarkets']);
+    Route::get('/wnba/props/best', [OddsController::class, 'getBestPlayerPropOdds']);
+    Route::get('/wnba/props/analysis', [OddsController::class, 'getPlayerPropsAnalysis']);
+    Route::get('/wnba/events/{eventId}/props', [OddsController::class, 'getEventPlayerProps']);
 });

@@ -14,6 +14,18 @@ class BettingRecommendationService
     }
 
     /**
+     * Ensure value is positive and rounded to nearest .5 increment
+     */
+    private function ensurePositiveAndRoundToHalf(float $value): float
+    {
+        // Ensure positive value (minimum 0.5)
+        $positiveValue = max(0.5, abs($value));
+
+        // Round to nearest .5 increment
+        return round($positiveValue * 2) / 2;
+    }
+
+    /**
      * Get betting recommendation for a specific prop
      */
     public function getRecommendation(
@@ -56,29 +68,28 @@ class BettingRecommendationService
                 'player_id' => $playerId,
                 'stat_type' => $statType,
                 'line' => $line,
-                'predicted_value' => round($predictedValue, 2),
-                'confidence' => round($confidence, 3),
-                'over_probability' => round($overProbability, 3),
-                'under_probability' => round($underProbability, 3),
-                'expected_value_over' => round($evOver, 3),
-                'expected_value_under' => round($evUnder, 3),
+                'predicted_value' => $this->ensurePositiveAndRoundToHalf($predictedValue),
+                'confidence' => $confidence,
+                'over_probability' => $overProbability,
+                'under_probability' => $underProbability,
+                'odds_over' => $oddsOver,
+                'odds_under' => $oddsUnder,
+                'expected_value_over' => $evOver,
+                'expected_value_under' => $evUnder,
                 'recommendation' => $recommendation['action'],
-                'reasoning' => $recommendation['reasoning'],
-                'odds' => [
-                    'over' => $oddsOver,
-                    'under' => $oddsUnder
-                ],
-                'generated_at' => now()->toISOString()
+                'reasoning' => $this->getRecommendationReasoning($recommendation['action'], $confidence, $evOver, $evUnder),
+                'timestamp' => now()->toISOString()
             ];
 
         } catch (\Exception $e) {
             Log::error('Error generating betting recommendation', [
-                'error' => $e->getMessage(),
                 'player_id' => $playerId,
                 'stat_type' => $statType,
-                'line' => $line
+                'line' => $line,
+                'error' => $e->getMessage()
             ]);
-            return $this->getEmptyRecommendation($playerId, $statType, $line, $oddsOver, $oddsUnder, $e->getMessage());
+
+            return $this->getEmptyRecommendation($playerId, $statType, $line, $oddsOver, $oddsUnder);
         }
     }
 
@@ -177,5 +188,19 @@ class BettingRecommendationService
             ],
             'generated_at' => now()->toISOString()
         ];
+    }
+
+    private function getRecommendationReasoning(string $action, float $confidence, float $evOver, float $evUnder): string
+    {
+        switch ($action) {
+            case 'over':
+                return "Recommend OVER based on {$confidence}% confidence and positive expected value of {$evOver}%";
+            case 'under':
+                return "Recommend UNDER based on {$confidence}% confidence and positive expected value of {$evUnder}%";
+            case 'avoid':
+                return "Avoid this bet due to low confidence ({$confidence}%) or negative expected values";
+            default:
+                return "No clear recommendation available";
+        }
     }
 }

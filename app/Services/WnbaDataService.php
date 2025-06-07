@@ -448,7 +448,7 @@ class WnbaDataService
                     'player_id' => $player->id,
                 ],
                 [
-                    'team_id' => $team->id,
+                    'team_id' => $team->team_id,
                     'minutes' => $record['minutes'] ?? 0,
                     'field_goals_made' => $record['field_goals_made'] ?? 0,
                     'field_goals_attempted' => $record['field_goals_attempted'] ?? 0,
@@ -536,10 +536,10 @@ class WnbaDataService
             WnbaGameTeam::updateOrCreate(
                 [
                     'game_id' => $game->id,
-                    'team_id' => $team->id,
+                    'team_id' => $team->team_id,
                 ],
                 [
-                    'opponent_team_id' => $opponentTeam->id,
+                    'opponent_team_id' => $opponentTeam->team_id,
                     'home_away' => $record['home_away'],
                     'team_winner' => $record['team_winner'] ?? false,
                     'team_score' => $record['team_score'] ?? 0,
@@ -589,6 +589,9 @@ class WnbaDataService
                 ]
             );
 
+            $homeTeam = null;
+            $awayTeam = null;
+
             // Create or update home team (only if home_team_id is not null)
             if (!empty($record['home_team_id'])) {
                 $homeTeam = WnbaTeam::updateOrCreate(
@@ -621,6 +624,67 @@ class WnbaDataService
                         'team_logo' => $record['away_team_logo'],
                         'team_color' => $record['away_team_color'],
                         'team_alternate_color' => $record['away_team_alternate_color'],
+                    ]
+                );
+            }
+
+            // Create WnbaGameTeam records to associate teams with games
+            if ($homeTeam && $awayTeam) {
+                // Create home team association
+                WnbaGameTeam::updateOrCreate(
+                    [
+                        'game_id' => $game->id,
+                        'team_id' => $homeTeam->team_id,
+                    ],
+                    [
+                        'opponent_team_id' => $awayTeam->team_id,
+                        'home_away' => 'home',
+                        'team_winner' => false, // Default, will be updated when game is completed
+                        'team_score' => 0, // Default, will be updated when game is completed
+                        'opponent_team_score' => 0, // Default, will be updated when game is completed
+                        'field_goals_made' => 0,
+                        'field_goals_attempted' => 0,
+                        'three_point_field_goals_made' => 0,
+                        'three_point_field_goals_attempted' => 0,
+                        'free_throws_made' => 0,
+                        'free_throws_attempted' => 0,
+                        'offensive_rebounds' => 0,
+                        'defensive_rebounds' => 0,
+                        'rebounds' => 0,
+                        'assists' => 0,
+                        'steals' => 0,
+                        'blocks' => 0,
+                        'turnovers' => 0,
+                        'fouls' => 0,
+                    ]
+                );
+
+                // Create away team association
+                WnbaGameTeam::updateOrCreate(
+                    [
+                        'game_id' => $game->id,
+                        'team_id' => $awayTeam->team_id,
+                    ],
+                    [
+                        'opponent_team_id' => $homeTeam->team_id,
+                        'home_away' => 'away',
+                        'team_winner' => false, // Default, will be updated when game is completed
+                        'team_score' => 0, // Default, will be updated when game is completed
+                        'opponent_team_score' => 0, // Default, will be updated when game is completed
+                        'field_goals_made' => 0,
+                        'field_goals_attempted' => 0,
+                        'three_point_field_goals_made' => 0,
+                        'three_point_field_goals_attempted' => 0,
+                        'free_throws_made' => 0,
+                        'free_throws_attempted' => 0,
+                        'offensive_rebounds' => 0,
+                        'defensive_rebounds' => 0,
+                        'rebounds' => 0,
+                        'assists' => 0,
+                        'steals' => 0,
+                        'blocks' => 0,
+                        'turnovers' => 0,
+                        'fouls' => 0,
                     ]
                 );
             }
@@ -703,14 +767,14 @@ class WnbaDataService
                     'period' => $record['period'],
                     'period_display_value' => $record['period_display_value'],
                     'clock_display_value' => $record['clock_display_value'],
-                    'team_id' => $team->id,
+                    'team_id' => $team->team_id,
                     'player_id' => $player?->id,
                     'play_type_id' => $record['play_type_id'],
                     'play_type_text' => $record['play_type_text'],
                     'play_type_abbreviation' => $record['play_type_abbreviation'],
                     'play_text' => $record['play_text'],
                     'score_value' => $record['score_value'],
-                    'score_team_id' => $scoreTeam?->id,
+                    'score_team_id' => $scoreTeam?->team_id,
                 ]
             );
         }

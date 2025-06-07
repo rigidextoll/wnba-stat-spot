@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { api } from '$lib/api/client';
     import DefaultLayout from "$lib/layouts/DefaultLayout.svelte";
+    import TodaysBestProps from "$lib/components/TodaysBestProps.svelte";
     import type { Player, Prediction, PropBet } from '$lib/api/client';
 
     let players: Player[] = [];
@@ -87,7 +88,7 @@
 </script>
 
 <svelte:head>
-    <title>Prediction Engine | WNBA Stat Spot</title>
+    <title>Today's Best Props & Predictions | WNBA Stat Spot</title>
 </svelte:head>
 
 <DefaultLayout>
@@ -95,9 +96,16 @@
         <div class="row">
             <div class="col-12">
                 <div class="page-title-box">
-                    <h4 class="page-title">Prediction Engine</h4>
-                    <p class="text-muted mb-0">Generate AI-powered predictions for WNBA player props and betting lines</p>
+                    <h4 class="page-title">Predictions & Today's Best Props</h4>
+                    <p class="text-muted mb-0">Discover today's most profitable prop bets and generate custom AI-powered predictions</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Today's Best Props - Featured Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <TodaysBestProps />
             </div>
         </div>
 

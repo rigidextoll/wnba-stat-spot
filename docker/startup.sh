@@ -286,7 +286,7 @@ wait_for_database() {
         echo "   DB_USERNAME: ${DB_USERNAME:-'NOT SET'}"
     fi
 
-    local max_attempts=30
+    local max_attempts=50
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do

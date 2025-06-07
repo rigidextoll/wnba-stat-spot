@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('game_id')->constrained('wnba_games', 'id');
             $table->foreignId('player_id')->constrained('wnba_players', 'id');
-            $table->foreignId('team_id')->constrained('wnba_teams', 'id');
+            $table->string('team_id')->index();
             $table->string('minutes')->nullable();
             $table->integer('field_goals_made');
             $table->integer('field_goals_attempted');
@@ -38,6 +38,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['game_id', 'player_id']);
+
+            // Add foreign key constraint to reference team_id column
+            $table->foreign('team_id')->references('team_id')->on('wnba_teams');
         });
     }
 

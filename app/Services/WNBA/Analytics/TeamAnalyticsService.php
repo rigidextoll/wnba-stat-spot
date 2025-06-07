@@ -259,6 +259,51 @@ class TeamAnalyticsService
         });
     }
 
+    /**
+     * Get comprehensive analytics for a team
+     */
+    public function getAnalytics(int $teamId): array
+    {
+        try {
+            return [
+                'team_id' => $teamId,
+                'basic_stats' => $this->getBasicStats($teamId),
+                'advanced_stats' => $this->getAdvancedStats($teamId),
+                'offensive_stats' => $this->getOffensiveStats($teamId),
+                'defensive_stats' => $this->getDefensiveStats($teamId),
+                'efficiency_metrics' => $this->getEfficiencyMetrics($teamId),
+                'pace_and_tempo' => $this->getPaceAndTempo($teamId),
+                'clutch_performance' => $this->getClutchPerformance($teamId),
+                'home_away_splits' => $this->getHomeAwaySplits($teamId),
+                'monthly_performance' => $this->getMonthlyPerformance($teamId),
+                'strength_of_schedule' => $this->getStrengthOfSchedule($teamId),
+                'injury_impact' => $this->getInjuryImpact($teamId),
+                'roster_analysis' => $this->getRosterAnalysis($teamId),
+                'recent_form' => $this->getRecentForm($teamId),
+                'head_to_head' => $this->getHeadToHeadRecords($teamId)
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to get team analytics', [
+                'team_id' => $teamId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'team_id' => $teamId,
+                'error' => 'Failed to retrieve analytics',
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get basic team statistics
+     */
+    public function getBasicStats(int $teamId): array
+    {
+        // Implementation of getBasicStats method
+    }
+
     // Private helper methods
 
     private function getTeamGames(int $teamId, int $season, ?int $lastNGames = null): Collection

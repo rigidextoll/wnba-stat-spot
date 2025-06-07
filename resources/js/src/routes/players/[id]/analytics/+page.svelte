@@ -7,114 +7,342 @@
     import HomeAwayComparisonChart from '$lib/components/charts/HomeAwayComparisonChart.svelte';
     import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
     import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+    import DefaultLayout from "$lib/layouts/DefaultLayout.svelte";
+    import { api } from '$lib/api/client';
 
-    const playerId = $page.params.id;
+    const urlPlayerId = $page.params.id;
+    let playerInfo: any = null;
+    let databasePlayerId: string | null = null;
+    let loading = true;
+    let error: string | null = null;
 
-    onMount(() => {
-        playerAnalytics.fetchAnalytics(playerId);
+    // Transform game stats data for chart component
+    $: chartData = $gameStatsChartData.map(game => ({
+        date: game.date,
+        value: game.points // PlayerStatsChart expects 'value' property
+    }));
+
+    onMount(async () => {
+        try {
+            loading = true;
+            error = null;
+
+            // First, get the player info to determine the database ID
+            const playerResponse = await api.players.getById(urlPlayerId);
+            playerInfo = playerResponse.data;
+            databasePlayerId = playerInfo.id.toString();
+
+            // Type safety check - ensure databasePlayerId is not null
+            if (databasePlayerId) {
+                // Now fetch analytics using the database ID
+                await playerAnalytics.fetchAnalytics(databasePlayerId);
+            } else {
+                throw new Error('Player ID not found');
+            }
+
+        } catch (err) {
+            console.error('Error loading player analytics:', err);
+            error = err instanceof Error ? err.message : 'Failed to load player data';
+        } finally {
+            loading = false;
+        }
     });
 </script>
 
-<div class="container mx-auto px-4 py-8">
-    {#if $playerAnalytics.loading}
-        <div class="flex justify-center items-center h-64">
-            <LoadingSpinner />
-        </div>
-    {:else if $playerAnalytics.error}
-        <ErrorMessage message={$playerAnalytics.error} />
-    {:else}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Game Stats Chart -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Game Statistics</h2>
-                {#if $gameStatsChartData.length > 0}
-                    <PlayerStatsChart data={$gameStatsChartData} />
-                {:else}
-                    <p class="text-gray-500">No game statistics available</p>
-                {/if}
-            </div>
+<svelte:head>
+    <title>{playerInfo?.athlete_display_name || 'Player'} Analytics | WNBA Stat Spot</title>
+</svelte:head>
 
-            <!-- Shooting Efficiency Chart -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Shooting Efficiency</h2>
-                {#if $shootingEfficiencyData}
-                    <ShootingEfficiencyChart data={$shootingEfficiencyData} />
-                {:else}
-                    <p class="text-gray-500">No shooting efficiency data available</p>
-                {/if}
-            </div>
-
-            <!-- Home vs Away Comparison -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Home vs Away Performance</h2>
-                {#if $homeAwayComparison}
-                    <HomeAwayComparisonChart data={$homeAwayComparison} />
-                {:else}
-                    <p class="text-gray-500">No home/away comparison data available</p>
-                {/if}
-            </div>
-
-            <!-- Recent Form -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Recent Form</h2>
-                {#if $playerAnalytics.recentForm}
-                    <div class="space-y-4">
-                        <p class="text-gray-600">
-                            Last {$playerAnalytics.recentForm.games_analyzed} games
-                        </p>
-                        <div class="grid grid-cols-2 gap-4">
-                            {#each Object.entries($playerAnalytics.recentForm.averages) as [stat, value]}
-                                <div class="bg-gray-50 p-3 rounded">
-                                    <p class="text-sm text-gray-500">{stat}</p>
-                                    <p class="text-lg font-semibold">{value.toFixed(1)}</p>
-                                </div>
-                            {/each}
+<DefaultLayout>
+    <div class="container-xxl">
+        {#if loading || $playerAnalytics.loading}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 mb-0">Loading player analytics...</p>
                         </div>
                     </div>
-                {:else}
-                    <p class="text-gray-500">No recent form data available</p>
-                {/if}
+                </div>
             </div>
-
-            <!-- Per 36 Minutes Stats -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Per 36 Minutes</h2>
-                {#if $playerAnalytics.per36Stats}
-                    <div class="grid grid-cols-2 gap-4">
-                        {#each Object.entries($playerAnalytics.per36Stats) as [stat, value]}
-                            <div class="bg-gray-50 p-3 rounded">
-                                <p class="text-sm text-gray-500">{stat}</p>
-                                <p class="text-lg font-semibold">{value.toFixed(1)}</p>
-                            </div>
-                        {/each}
+        {:else if error || $playerAnalytics.error}
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Error:</strong> {error || $playerAnalytics.error || 'Unknown error'}
                     </div>
-                {:else}
-                    <p class="text-gray-500">No per 36 minutes data available</p>
-                {/if}
+                </div>
             </div>
-
-            <!-- Advanced Metrics -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Advanced Metrics</h2>
-                {#if $playerAnalytics.advancedMetrics}
-                    <div class="grid grid-cols-2 gap-4">
-                        {#each Object.entries($playerAnalytics.advancedMetrics) as [stat, value]}
-                            <div class="bg-gray-50 p-3 rounded">
-                                <p class="text-sm text-gray-500">{stat}</p>
-                                <p class="text-lg font-semibold">{value.toFixed(1)}</p>
-                            </div>
-                        {/each}
+        {:else if playerInfo}
+            <!-- Page Title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box">
+                        <h4 class="page-title">Player Analytics</h4>
+                        <p class="text-muted mb-0">Comprehensive performance analysis and statistics</p>
                     </div>
-                {:else}
-                    <p class="text-gray-500">No advanced metrics available</p>
-                {/if}
+                </div>
             </div>
-        </div>
-    {/if}
-</div>
 
-<style>
-    .container {
-        max-width: 1280px;
-    }
-</style>
+            <!-- Player Header Card -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                {#if playerInfo.athlete_headshot_href}
+                                    <div class="avatar-lg me-3">
+                                        <img
+                                            src={playerInfo.athlete_headshot_href}
+                                            alt={playerInfo.athlete_display_name}
+                                            class="avatar-lg rounded-circle"
+                                        />
+                                    </div>
+                                {/if}
+                                <div class="flex-grow-1">
+                                    <h3 class="mb-1">{playerInfo.athlete_display_name}</h3>
+                                    <p class="text-muted mb-0">
+                                        <span class="badge bg-primary me-2">#{playerInfo.athlete_jersey}</span>
+                                        {playerInfo.athlete_position_name}
+                                    </p>
+                                </div>
+                                <div class="text-end">
+                                    <a href="/players/{urlPlayerId}" class="btn btn-outline-primary">
+                                        <i class="fas fa-arrow-left me-1"></i>
+                                        Back to Player
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Grid -->
+            <div class="row">
+                <!-- Game Statistics Chart -->
+                <div class="col-xl-6 col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Game Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {#if chartData.length > 0}
+                                <PlayerStatsChart data={chartData} />
+                            {:else}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-chart-line text-muted fs-48 mb-3"></i>
+                                    <p class="text-muted mb-0">No game statistics available</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shooting Efficiency Chart -->
+                <div class="col-xl-6 col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-bullseye me-2"></i>
+                                Shooting Efficiency
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {#if $shootingEfficiencyData}
+                                <ShootingEfficiencyChart data={$shootingEfficiencyData} />
+                            {:else}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-bullseye text-muted fs-48 mb-3"></i>
+                                    <p class="text-muted mb-0">No shooting efficiency data available</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Home vs Away Comparison Chart -->
+                <div class="col-xl-6 col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-home me-2"></i>
+                                Home vs Away Performance
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {#if $homeAwayComparison}
+                                <HomeAwayComparisonChart data={$homeAwayComparison} />
+                            {:else}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-home text-muted fs-48 mb-3"></i>
+                                    <p class="text-muted mb-0">No home/away comparison data available</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Form -->
+                <div class="col-xl-6 col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-trending-up me-2"></i>
+                                Recent Form
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {#if $playerAnalytics.recentForm && $playerAnalytics.recentForm.averages}
+                                <div class="mb-3">
+                                    <p class="text-muted mb-2">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        Last {$playerAnalytics.recentForm.games_analyzed} games
+                                        {#if $playerAnalytics.recentForm.game_log && $playerAnalytics.recentForm.game_log.length > 0}
+                                            ({$playerAnalytics.recentForm.game_log[$playerAnalytics.recentForm.game_log.length - 1].date} to {$playerAnalytics.recentForm.game_log[0].date})
+                                        {/if}
+                                    </p>
+                                </div>
+                                <div class="row g-3">
+                                    {#each Object.entries($playerAnalytics.recentForm.averages) as [stat, value]}
+                                        <div class="col-md-6">
+                                            <div class="bg-light p-3 rounded">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="text-muted small text-capitalize">{stat.replace(/_/g, ' ')}</span>
+                                                    <span class="fw-bold">
+                                                        {typeof value === 'number' ? value.toFixed(1) : value}
+                                                        {#if stat.includes('pct')}%{/if}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-trending-up text-muted fs-48 mb-3"></i>
+                                    <p class="text-muted mb-0">No recent form data available</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shooting Efficiency Stats -->
+                <div class="col-xl-6 col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-percentage me-2"></i>
+                                Shooting Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {#if $playerAnalytics.shootingEfficiency}
+                                <div class="row g-3">
+                                    {#each Object.entries($playerAnalytics.shootingEfficiency) as [stat, value]}
+                                        {#if typeof value === 'number'}
+                                            <div class="col-md-6">
+                                                <div class="bg-light p-3 rounded">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span class="text-muted small text-capitalize">{stat.replace(/_/g, ' ')}</span>
+                                                        <span class="fw-bold">
+                                                            {value.toFixed(1)}{#if stat.includes('percentage')}%{/if}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {/if}
+                                    {/each}
+                                </div>
+                            {:else}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-percentage text-muted fs-48 mb-3"></i>
+                                    <p class="text-muted mb-0">No shooting efficiency data available</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Home vs Away Stats -->
+                <div class="col-xl-6 col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-map-marker-alt me-2"></i>
+                                Home vs Away Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {#if $playerAnalytics.homeAwayPerformance}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="border-end pe-3">
+                                            <h6 class="text-success mb-3">
+                                                <i class="fas fa-home me-1"></i>
+                                                Home ({$playerAnalytics.homeAwayPerformance.home.games} games)
+                                            </h6>
+                                            <div class="space-y-2">
+                                                {#each Object.entries($playerAnalytics.homeAwayPerformance.home.stats || {}) as [stat, value]}
+                                                    {#if typeof value === 'number' && ['points', 'rebounds', 'assists'].includes(stat)}
+                                                        <div class="d-flex justify-content-between mb-2">
+                                                            <span class="text-muted small text-capitalize">{stat}:</span>
+                                                            <span class="fw-bold">{value.toFixed(1)}</span>
+                                                        </div>
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="ps-3">
+                                            <h6 class="text-primary mb-3">
+                                                <i class="fas fa-plane me-1"></i>
+                                                Away ({$playerAnalytics.homeAwayPerformance.away.games} games)
+                                            </h6>
+                                            <div class="space-y-2">
+                                                {#each Object.entries($playerAnalytics.homeAwayPerformance.away.stats || {}) as [stat, value]}
+                                                    {#if typeof value === 'number' && ['points', 'rebounds', 'assists'].includes(stat)}
+                                                        <div class="d-flex justify-content-between mb-2">
+                                                            <span class="text-muted small text-capitalize">{stat}:</span>
+                                                            <span class="fw-bold">{value.toFixed(1)}</span>
+                                                        </div>
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {:else}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-map-marker-alt text-muted fs-48 mb-3"></i>
+                                    <p class="text-muted mb-0">No home/away performance data available</p>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {:else}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-user-slash text-muted fs-48 mb-3"></i>
+                            <h5 class="text-muted">Player not found</h5>
+                            <p class="text-muted mb-0">The requested player could not be found.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {/if}
+    </div>
+</DefaultLayout>

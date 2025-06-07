@@ -107,23 +107,33 @@ class StatisticalEngineService
     }
 
     /**
-     * Run Monte Carlo simulation for a player's stat prediction
+     * Ensure value is positive and rounded to nearest .5 increment
+     *
+     * @param float $value Input value
+     * @return float Normalized positive value rounded to .5 increments
+     */
+    private function ensurePositiveAndRoundToHalf(float $value): float
+    {
+        // Ensure positive value (minimum 0.5)
+        $positiveValue = max(0.5, abs($value));
+
+        // Round to nearest .5 increment
+        return round($positiveValue * 2) / 2;
+    }
+
+    /**
+     * Run Monte Carlo simulation for player statistics prediction
      *
      * @param int $playerId Player ID
      * @param int $gameId Game ID
      * @param string $statType Type of statistic to simulate
-     * @param float $lineValue Line value for over/under
+     * @param float $lineValue Betting line value
      * @param int $iterations Number of simulation iterations
-     * @return array Simulation results including probabilities and confidence intervals
-     * @throws \RuntimeException If no historical data is available
+     * @return array Simulation results with normalized values
+     * @throws \Exception
      */
-    public function runMonteCarloSimulation(
-        int $playerId,
-        int $gameId,
-        string $statType,
-        float $lineValue,
-        int $iterations = 10000
-    ): array {
+    public function runMonteCarloSimulation(int $playerId, int $gameId, string $statType, float $lineValue, int $iterations = 10000): array
+    {
         try {
             // Get historical data
             $historicalData = $this->getHistoricalData($playerId, $statType);
@@ -159,14 +169,23 @@ class StatisticalEngineService
             // Calculate confidence intervals
             $confidenceIntervals = $this->calculateConfidenceIntervals($results);
 
+            // Normalize results
+            $normalizedResults = array_map(fn($value) => $this->ensurePositiveAndRoundToHalf($value), $results);
+
             return [
                 'over_probability' => $overProbability,
-                'expected_value' => $expectedValue,
-                'standard_deviation' => $stdDev,
-                'confidence_intervals' => $confidenceIntervals,
+                'expected_value' => $this->ensurePositiveAndRoundToHalf($expectedValue),
+                'standard_deviation' => $this->ensurePositiveAndRoundToHalf($stdDev),
+                'confidence_intervals' => [
+                    'lower_95' => $this->ensurePositiveAndRoundToHalf($confidenceIntervals['lower_95']),
+                    'upper_95' => $this->ensurePositiveAndRoundToHalf($confidenceIntervals['upper_95']),
+                    'lower_90' => $this->ensurePositiveAndRoundToHalf($confidenceIntervals['lower_90']),
+                    'upper_90' => $this->ensurePositiveAndRoundToHalf($confidenceIntervals['upper_90'])
+                ],
                 'distribution' => $distribution,
                 'parameters' => $params,
-                'iterations' => $iterations
+                'iterations' => $iterations,
+                'normalized_results' => $normalizedResults
             ];
 
         } catch (\Exception $e) {
@@ -754,38 +773,51 @@ class StatisticalEngineService
     }
 
     /**
-     * Calculate Normal over probability
+     * Calculate binomial over probability
      */
-    private function calculateNormalOverProbability(array $distribution, float $lineValue): float
+    public function calculateBinomialOverProbability(array $params, float $threshold): float
     {
-        $mean = $distribution['mean'] ?? 0;
-        $stdDev = $distribution['std_dev'] ?? 1;
+        $n = $params['n'] ?? 10;
+        $p = $params['p'] ?? 0.5;
 
-        if ($stdDev <= 0) return 0.5;
+        // Calculate probability of getting more than threshold successes
+        $probability = 0.0;
+        for ($k = intval($threshold) + 1; $k <= $n; $k++) {
+            $probability += $this->binomialProbability($n, $k, $p);
+        }
 
-        $z = ($lineValue - $mean) / $stdDev;
-        return 1 - $this->normalCDF($z);
+        return $this->ensurePositiveAndRoundToHalf($probability);
     }
 
     /**
-     * Calculate Binomial over probability
+     * Calculate normal distribution over probability
      */
-    private function calculateBinomialOverProbability(array $distribution, float $lineValue): float
+    public function calculateNormalOverProbability(array $params, float $threshold): float
     {
-        $n = $distribution['n'] ?? 0;
-        $p = $distribution['p'] ?? 0.5;
+        $mean = $params['mean'] ?? 0;
+        $stdDev = $params['std_dev'] ?? 1;
 
-        if ($n <= 0 || $p <= 0 || $p >= 1) return 0.5;
+        // Calculate z-score
+        $z = ($threshold - $mean) / $stdDev;
 
-        $probability = 0;
-        $k = floor($lineValue);
+        // Calculate probability using normal CDF approximation
+        $probability = 1 - $this->normalCDF($z);
 
-        // Calculate probability of X > lineValue
-        for ($i = 0; $i <= $k; $i++) {
-            $probability += $this->binomialCoefficient($n, $i) * pow($p, $i) * pow(1 - $p, $n - $i);
-        }
+        return $this->ensurePositiveAndRoundToHalf($probability);
+    }
 
-        return 1 - $probability;
+    /**
+     * Calculate binomial probability for specific k successes
+     */
+    private function binomialProbability(int $n, int $k, float $p): float
+    {
+        if ($k > $n || $k < 0) return 0.0;
+
+        // Calculate binomial coefficient C(n,k)
+        $coefficient = $this->binomialCoefficient($n, $k);
+
+        // Calculate probability
+        return $coefficient * pow($p, $k) * pow(1 - $p, $n - $k);
     }
 
     /**

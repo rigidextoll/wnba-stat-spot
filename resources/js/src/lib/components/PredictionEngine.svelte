@@ -25,6 +25,24 @@
         { value: 'minutes', label: 'Minutes' }
     ];
 
+    function validateAndNormalizeLine(value: number): number {
+        // Ensure positive value (minimum 0.5)
+        const positiveValue = Math.max(0.5, Math.abs(value));
+
+        // Round to nearest .5 increment
+        return Math.round(positiveValue * 2) / 2;
+    }
+
+    function handleLineInput(event: Event) {
+        const target = event.target as HTMLInputElement;
+        const value = parseFloat(target.value);
+
+        if (!isNaN(value)) {
+            selectedLine = validateAndNormalizeLine(value);
+            target.value = selectedLine.toString();
+        }
+    }
+
     async function generatePrediction() {
         if (!playerId || !selectedStat || selectedLine <= 0) return;
 
@@ -72,7 +90,9 @@
     }
 
     function formatNumber(value: number): string {
-        return value.toFixed(1);
+        // Ensure positive value and round to .5 increments before formatting
+        const normalizedValue = Math.max(0.5, Math.round(Math.abs(value) * 2) / 2);
+        return normalizedValue.toFixed(1);
     }
 
     function getConfidenceColor(confidence: number): string {
@@ -94,6 +114,17 @@
         prediction = null;
         selectedStat = '';
         selectedLine = 0;
+        error = '';
+    }
+
+    // Export function for parent components to pre-fill values
+    export function prefillStat(stat: string, line?: number) {
+        selectedStat = stat;
+        if (line !== undefined) {
+            selectedLine = validateAndNormalizeLine(line);
+        }
+        // Clear any existing prediction to show the form
+        prediction = null;
         error = '';
     }
 </script>
@@ -150,6 +181,7 @@
                         bind:value={selectedLine}
                         class="form-control"
                         placeholder="e.g., 15.5"
+                        on:input={handleLineInput}
                     />
                 </div>
 

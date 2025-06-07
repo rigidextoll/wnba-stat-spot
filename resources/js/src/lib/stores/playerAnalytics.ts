@@ -25,6 +25,7 @@ export interface PlayerAnalyticsState {
     recentForm: {
         games_analyzed: number;
         averages: Record<string, number>;
+        game_log?: any[];
     } | null;
     per36Stats: Record<string, number> | null;
     advancedMetrics: Record<string, number> | null;
@@ -53,15 +54,32 @@ function createPlayerAnalyticsStore() {
                 const response = await api.wnba.analytics.getPlayer(playerId);
                 const analytics = response.data;
 
+                // Convert game_log to gameStats format
+                const gameStats = analytics.recent_form?.game_log?.map((game: any) => ({
+                    date: game.date,
+                    points: game.points || 0,
+                    rebounds: game.rebounds || 0,
+                    assists: game.assists || 0,
+                    steals: game.steals || 0,
+                    blocks: game.blocks || 0,
+                    minutes: parseFloat(game.minutes) || 0,
+                    fg_made: parseInt(game.fg_made_attempted?.split('/')[0]) || 0,
+                    fg_attempted: parseInt(game.fg_made_attempted?.split('/')[1]) || 0,
+                    three_made: parseInt(game.three_pt_made_attempted?.split('/')[0]) || 0,
+                    three_attempted: parseInt(game.three_pt_made_attempted?.split('/')[1]) || 0,
+                    ft_made: parseInt(game.ft_made_attempted?.split('/')[0]) || 0,
+                    ft_attempted: parseInt(game.ft_made_attempted?.split('/')[1]) || 0,
+                })) || [];
+
                 update(state => ({
                     ...state,
                     loading: false,
-                    gameStats: analytics.game_stats || [],
-                    recentForm: analytics.analytics.recent_form || null,
-                    per36Stats: analytics.analytics.per_36_stats || null,
-                    advancedMetrics: analytics.analytics.advanced_metrics || null,
-                    shootingEfficiency: analytics.analytics.shooting_efficiency || null,
-                    homeAwayPerformance: analytics.analytics.home_away_performance || null
+                    gameStats: gameStats,
+                    recentForm: analytics.recent_form || null,
+                    per36Stats: analytics.per_36_stats || null,
+                    advancedMetrics: analytics.advanced_metrics || null,
+                    shootingEfficiency: analytics.shooting_efficiency || null,
+                    homeAwayPerformance: analytics.home_away_performance || null
                 }));
             } catch (error) {
                 update(state => ({
@@ -111,11 +129,11 @@ export const shootingEfficiencyData = derived(
         if (!$playerAnalytics.shootingEfficiency) return null;
 
         return {
-            fgPercentage: $playerAnalytics.shootingEfficiency.fg_percentage || 0,
-            threePercentage: $playerAnalytics.shootingEfficiency.three_percentage || 0,
-            ftPercentage: $playerAnalytics.shootingEfficiency.ft_percentage || 0,
-            efgPercentage: $playerAnalytics.shootingEfficiency.efg_percentage || 0,
-            tsPercentage: $playerAnalytics.shootingEfficiency.ts_percentage || 0
+            fgPercentage: $playerAnalytics.shootingEfficiency.field_goal_percentage || 0,
+            threePercentage: $playerAnalytics.shootingEfficiency.three_point_percentage || 0,
+            ftPercentage: $playerAnalytics.shootingEfficiency.free_throw_percentage || 0,
+            efgPercentage: $playerAnalytics.shootingEfficiency.effective_field_goal_percentage || 0,
+            tsPercentage: $playerAnalytics.shootingEfficiency.true_shooting_percentage || 0
         };
     }
 );

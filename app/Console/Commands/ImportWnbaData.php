@@ -40,6 +40,14 @@ class ImportWnbaData extends Command
             $this->info('✅ Database tables ready.');
             $this->newLine();
 
+            // Force clean: Clear existing data if --force flag is used
+            if ($force) {
+                $this->info('🧹 Force mode: Clearing existing WNBA data...');
+                $this->clearExistingData();
+                $this->info('✅ Existing data cleared.');
+                $this->newLine();
+            }
+
             // Step 1: Import team data
             $this->info('📊 Step 1: Downloading and importing team data...');
             $teamDataPath = $service->downloadTeamData();
@@ -84,6 +92,50 @@ class ImportWnbaData extends Command
         $this->info('🎉 WNBA data import completed successfully!');
         $this->info('💡 You can now access the analytics dashboard and prediction engine.');
         return 0;
+    }
+
+    /**
+     * Clear all existing WNBA data from the database
+     */
+    private function clearExistingData()
+    {
+        // Disable foreign key checks temporarily
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+        $tables = [
+            'wnba_player_games',  // Clear this first due to foreign key constraints
+            'wnba_plays',         // Clear plays that might reference games and teams
+            'wnba_game_teams',    // Clear this before games - team associations
+            'wnba_games',         // Clear games before teams (if there are direct FK constraints)
+            'wnba_players',       // Clear players
+            'wnba_teams'          // Clear teams last
+        ];
+
+        foreach ($tables as $table) {
+            try {
+                $count = DB::table($table)->count();
+                if ($count > 0) {
+                    DB::table($table)->truncate();
+                    $this->line("   🗑️  Cleared {$count} records from {$table}");
+                } else {
+                    $this->line("   ✓ {$table} was already empty");
+                }
+            } catch (\Exception $e) {
+                // If truncate fails due to foreign keys, try delete
+                try {
+                    $count = DB::table($table)->count();
+                    if ($count > 0) {
+                        DB::table($table)->delete();
+                        $this->line("   🗑️  Cleared {$count} records from {$table} (using DELETE)");
+                    }
+                } catch (\Exception $deleteError) {
+                    $this->warn("   ⚠️  Could not clear {$table}: " . $deleteError->getMessage());
+                }
+            }
+        }
+
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     private function displayImportSummary()

@@ -1,8 +1,10 @@
 services:
+  # Main Application (Laravel + SvelteKit)
   - type: web
     name: wnba-stat-spot
     runtime: docker
     dockerfilePath: ./Dockerfile
+    plan: starter # You can upgrade to standard/pro as needed
     envVars:
       - key: PORT
         value: "80"
@@ -12,26 +14,72 @@ services:
         value: "false"
       - key: APP_KEY
         generateValue: true
+      - key: APP_URL
+        fromService:
+          type: web
+          name: wnba-stat-spot
+          property: host
+
+      # Database Configuration (PostgreSQL)
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
-        value: dpg-d0r0621r0fns73fqmu70-a.oregon-postgres.render.com
+        fromDatabase:
+          name: wnba-stat-spot-db
+          property: host
       - key: DB_PORT
-        value: "5432"
+        fromDatabase:
+          name: wnba-stat-spot-db
+          property: port
       - key: DB_DATABASE
-        value: wnba_stat_spot
+        fromDatabase:
+          name: wnba-stat-spot-db
+          property: database
       - key: DB_USERNAME
-        value: wnba_user
+        fromDatabase:
+          name: wnba-stat-spot-db
+          property: user
       - key: DB_PASSWORD
-        sync: false  # You'll need to set this manually in the Render dashboard
+        fromDatabase:
+          name: wnba-stat-spot-db
+          property: password
+
+      # Redis Configuration
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: wnba-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: wnba-redis
+          property: port
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: wnba-redis
+          property: password
+
+      # Laravel Configuration
       - key: CACHE_DRIVER
-        value: database
+        value: redis
       - key: QUEUE_CONNECTION
-        value: database
+        value: redis
       - key: SESSION_DRIVER
-        value: database
-      - key: APP_URL
-        value: https://wnba-stat-spot.onrender.com
+        value: redis
+      - key: BROADCAST_DRIVER
+        value: log
+      - key: FILESYSTEM_DISK
+        value: local
+
+      # The Odds API Configuration (Set these in Render Dashboard)
+      - key: THE_ODDS_API_KEY
+        sync: false
+      - key: THE_ODDS_API_BASE_URL
+        value: https://api.the-odds-api.com
+      - key: THE_ODDS_API_SPORT
+        value: basketball_wnba
 
       # WNBA Cache Settings
       - key: WNBA_CACHE_ENABLED
@@ -131,7 +179,7 @@ services:
 
       # WNBA Features
       - key: WNBA_ENABLE_LIVE_UPDATES
-        value: "false"
+        value: "true"
       - key: WNBA_ENABLE_INJURY_TRACKING
         value: "true"
       - key: WNBA_ENABLE_WEATHER_FACTORS
@@ -155,7 +203,7 @@ services:
 
       # WNBA Season Settings
       - key: WNBA_CURRENT_SEASON
-        value: "2024"
+        value: "2025"
 
       # WNBA Advanced Metrics
       - key: WNBA_ENABLE_PLAYER_TRACKING
@@ -177,7 +225,18 @@ services:
       - key: WNBA_CALIBRATION_BINS
         value: "10"
 
+    # Health check for the web service
+    healthCheckPath: /
+
+  # Redis Cache Service
+  - type: redis
+    name: wnba-redis
+    plan: starter # 25MB - upgrade as needed
+    maxmemoryPolicy: allkeys-lru
+
 databases:
-  - name: wnba_stat_spot
+  # PostgreSQL Database
+  - name: wnba-stat-spot-db
     databaseName: wnba_stat_spot
     user: wnba_user
+    plan: starter # 1GB storage - upgrade as needed

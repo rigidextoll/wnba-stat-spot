@@ -31,4 +31,7 @@ Route::get('/health', function () {
 Route::get('/', [Main::class, 'main'])->name('main');
 
 // Catch-all route for SPA routing (Svelte Router) - MUST BE LAST
-Route::get('/{any}', [Main::class, 'main'])->where('any', '.*')->name('spa');
+// Exclude API routes from catch-all to prevent interference
+Route::get('/{any}', [Main::class, 'main'])
+    ->where('any', '^(?!api).*')
+    ->name('spa');

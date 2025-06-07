@@ -9,6 +9,7 @@ use App\Services\WNBA\Analytics\GameAnalyticsService;
 use App\Services\WNBA\Predictions\PropsPredictionService;
 use App\Services\WNBA\Predictions\StatisticalEngineService;
 use App\Services\WNBA\Predictions\ModelValidationService;
+use App\Services\WNBA\Predictions\PredictionEngine;
 use App\Services\WNBA\Math\BayesianCalculator;
 use App\Services\WNBA\Math\PoissonCalculator;
 use App\Services\WNBA\Math\MonteCarloSimulator;
@@ -32,6 +33,16 @@ class WnbaServiceProvider extends ServiceProvider
         // Register Data services as singletons
         $this->app->singleton(DataAggregatorService::class);
         $this->app->singleton(CacheManagerService::class);
+
+        // Register Statistical Engine service
+        $this->app->bind(StatisticalEngineService::class, function ($app) {
+            return new StatisticalEngineService(
+                $app->make(BayesianCalculator::class),
+                $app->make(PoissonCalculator::class),
+                $app->make(MonteCarloSimulator::class),
+                $app->make(RegressionAnalyzer::class)
+            );
+        });
 
         // Register Analytics services
         $this->app->bind(PlayerAnalyticsService::class, function ($app) {
@@ -59,24 +70,22 @@ class WnbaServiceProvider extends ServiceProvider
             );
         });
 
-        // Register Statistical Engine service
-        $this->app->bind(StatisticalEngineService::class, function ($app) {
-            return new StatisticalEngineService(
-                $app->make(BayesianCalculator::class),
-                $app->make(PoissonCalculator::class),
-                $app->make(MonteCarloSimulator::class),
-                $app->make(RegressionAnalyzer::class)
+        // Register Prediction Engine
+        $this->app->bind(PredictionEngine::class, function ($app) {
+            return new PredictionEngine(
+                $app->make(StatisticalEngineService::class),
+                $app->make(PlayerAnalyticsService::class),
+                $app->make(DataAggregatorService::class)
             );
         });
 
         // Register Prediction services
         $this->app->bind(PropsPredictionService::class, function ($app) {
             return new PropsPredictionService(
+                $app->make(PredictionEngine::class),
                 $app->make(PlayerAnalyticsService::class),
-                $app->make(StatisticalEngineService::class),
-                $app->make(BayesianCalculator::class),
-                $app->make(MonteCarloSimulator::class),
-                $app->make(PoissonCalculator::class)
+                $app->make(DataAggregatorService::class),
+                $app->make(StatisticalEngineService::class)
             );
         });
 
@@ -95,6 +104,7 @@ class WnbaServiceProvider extends ServiceProvider
         $this->app->alias(GameAnalyticsService::class, 'wnba.game.analytics');
         $this->app->alias(ModelValidationService::class, 'wnba.validation');
         $this->app->alias(CacheManagerService::class, 'wnba.cache');
+        $this->app->alias(PredictionEngine::class, 'wnba.prediction.engine');
     }
 
     /**
@@ -131,6 +141,7 @@ class WnbaServiceProvider extends ServiceProvider
             TeamAnalyticsService::class,
             GameAnalyticsService::class,
             StatisticalEngineService::class,
+            PredictionEngine::class,
             PropsPredictionService::class,
             ModelValidationService::class,
             'wnba.predictions',
@@ -139,6 +150,7 @@ class WnbaServiceProvider extends ServiceProvider
             'wnba.game.analytics',
             'wnba.validation',
             'wnba.cache',
+            'wnba.prediction.engine',
         ];
     }
 }

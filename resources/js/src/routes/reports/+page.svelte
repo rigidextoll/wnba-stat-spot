@@ -41,8 +41,10 @@
 
     async function analyzeGame(gameId: string) {
         try {
-            const analytics = await api.wnba.analytics.getGame(gameId);
-            console.log('Game Analytics:', analytics);
+            const response = await api.wnba.analytics.getGame(gameId);
+            if (response.success) {
+                return response.data;
+            }
         } catch (err) {
             console.error('Failed to analyze game:', err);
         }
@@ -50,8 +52,10 @@
 
     async function analyzeTeam(teamId: string) {
         try {
-            const analytics = await api.wnba.analytics.getTeam(teamId);
-            console.log('Team Analytics:', analytics);
+            const response = await api.wnba.analytics.getTeam(teamId);
+            if (response.success) {
+                return response.data;
+            }
         } catch (err) {
             console.error('Failed to analyze team:', err);
         }
