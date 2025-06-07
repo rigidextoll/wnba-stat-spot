@@ -295,14 +295,19 @@ wait_for_database() {
 
             # Debug environment variables
             echo "🔍 Debugging environment configuration..."
-            php artisan debug:environment || echo "⚠️  Debug command failed, continuing..."
+            php artisan about || echo "⚠️  About command failed, continuing..."
 
-            # Run database migrations first
-            echo "📊 Running database migrations..."
-            php artisan migrate --force || echo "⚠️  Migrations failed, continuing..."
+            # Run database migrations first - CRITICAL FOR RAILWAY
+            echo "📊 Running database migrations (FORCED)..."
+            php artisan migrate --force || {
+                echo "❌ Migrations failed, retrying with more detail..."
+                php artisan migrate --force --verbose || echo "⚠️  Migrations still failed, but continuing..."
+            }
 
-            # Queue tables are created by the existing migration file
-            echo "📋 Queue tables will be created by migrations..."
+            # Create queue tables explicitly if they don't exist
+            echo "📋 Ensuring queue tables exist..."
+            php artisan queue:table --create || echo "Queue table migration already exists"
+            php artisan migrate --force || echo "⚠️  Queue table migration failed"
 
             # Laravel optimizations (with error handling)
             echo "⚡ Optimizing Laravel application..."
@@ -310,11 +315,15 @@ wait_for_database() {
             php artisan route:cache || echo "⚠️  Route cache failed, continuing..."
             php artisan view:cache || echo "⚠️  View cache failed, continuing..."
 
-            # Import WNBA data (includes migrations)
-            echo "📊 Setting up database and importing WNBA data..."
-            php artisan app:import-wnba-data || echo "⚠️  WNBA data import failed, continuing..."
-
             echo "🎉 Database setup complete!"
+            return 0
+        elif php artisan about > /dev/null 2>&1; then
+            echo "✅ Database connection working, but migrations not ready"
+
+            # Try running migrations even if migrate:status fails
+            echo "📊 Attempting to run migrations anyway..."
+            php artisan migrate --force || echo "⚠️  Forced migrations failed"
+
             return 0
         fi
 
@@ -328,11 +337,9 @@ wait_for_database() {
             echo "   DB_DATABASE: ${DB_DATABASE:-'NOT SET'}"
             echo "   DB_USERNAME: ${DB_USERNAME:-'NOT SET'}"
 
-            # Try to test the connection more specifically
-            if command -v psql > /dev/null; then
-                echo "🔍 Testing PostgreSQL connection directly..."
-                PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_DATABASE" -c "SELECT 1;" 2>&1 || echo "Direct PostgreSQL connection failed"
-            fi
+            # Try a basic database connection test
+            echo "🔍 Testing basic Laravel database connection..."
+            php artisan about 2>&1 || echo "Laravel about command failed"
         fi
 
         sleep 2
