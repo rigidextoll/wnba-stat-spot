@@ -32,9 +32,10 @@
 
     async function analyzeTeam(teamId: string) {
         try {
-            const analytics = await api.wnba.analytics.getTeam(teamId);
-            console.log('Team Analytics:', analytics);
-            // You could show a modal or navigate to a detailed view here
+            const response = await api.wnba.analytics.getTeam(teamId.toString());
+            if (response.success) {
+                return response.data;
+            }
         } catch (err) {
             console.error('Failed to analyze team:', err);
         }

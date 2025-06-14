@@ -54,13 +54,13 @@ class WnbaPredictionsController extends Controller
 
             // Get prediction based on stat type
             $prediction = match($statType) {
-                'points' => $this->predictionService->predictPoints($playerId, $gameId, $season, $simulationRuns),
-                'rebounds' => $this->predictionService->predictRebounds($playerId, $gameId, $season, $simulationRuns),
-                'assists' => $this->predictionService->predictAssists($playerId, $gameId, $season, $simulationRuns),
-                'steals' => $this->predictionService->predictStealsBlocks($playerId, 'steals', $gameId, $season, $simulationRuns),
-                'blocks' => $this->predictionService->predictStealsBlocks($playerId, 'blocks', $gameId, $season, $simulationRuns),
-                'three_pointers' => $this->predictionService->predictThreePointers($playerId, $gameId, $season, $simulationRuns),
-                'minutes' => $this->predictionService->predictMinutes($playerId, $gameId, $season, $simulationRuns),
+                'points' => $this->predictionService->predictPoints($playerId, $gameId ?? 1),
+                'rebounds' => $this->predictionService->predictRebounds($playerId, $gameId ?? 1),
+                'assists' => $this->predictionService->predictAssists($playerId, $gameId ?? 1),
+                'steals' => $this->predictionService->predictSteals($playerId, $gameId ?? 1),
+                'blocks' => $this->predictionService->predictBlocks($playerId, $gameId ?? 1),
+                'three_pointers' => $this->predictionService->predictThreePointersMade($playerId, $gameId ?? 1),
+                'minutes' => $this->predictionService->predictMinutesPlayed($playerId, $gameId ?? 1),
                 default => throw new \InvalidArgumentException("Unsupported stat type: {$statType}")
             };
 
@@ -713,13 +713,16 @@ class WnbaPredictionsController extends Controller
 
             try {
                 $prediction = match($statType) {
-                    'points' => $this->predictionService->predictPoints($player->id, $mockGameId),
-                    'rebounds' => $this->predictionService->predictRebounds($player->id, $mockGameId),
-                    'assists' => $this->predictionService->predictAssists($player->id, $mockGameId),
-                    'steals' => $this->predictionService->predictStealsBlocks($player->id, $mockGameId)['steals'] ?? [],
-                    'blocks' => $this->predictionService->predictStealsBlocks($player->id, $mockGameId)['blocks'] ?? [],
-                    'three_pointers' => $this->predictionService->predictThreePointers($player->id, $mockGameId),
-                    'minutes' => $this->predictionService->predictMinutes($player->id, $mockGameId),
+                    'points' => $this->predictionService->predictPoints($player->id, $mockGameId, $line),
+                    'rebounds' => $this->predictionService->predictRebounds($player->id, $mockGameId, $line),
+                    'assists' => $this->predictionService->predictAssists($player->id, $mockGameId, $line),
+                    'steals' => $this->predictionService->predictSteals($player->id, $mockGameId, $line),
+                    'blocks' => $this->predictionService->predictBlocks($player->id, $mockGameId, $line),
+                    'three_pointers_made' => $this->predictionService->predictThreePointersMade($player->id, $mockGameId, $line),
+                    'field_goals_made' => $this->predictionService->predictFieldGoalsMade($player->id, $mockGameId, $line),
+                    'free_throws_made' => $this->predictionService->predictFreeThrowsMade($player->id, $mockGameId, $line),
+                    'turnovers' => $this->predictionService->predictTurnovers($player->id, $mockGameId, $line),
+                    'minutes' => $this->predictionService->predictMinutesPlayed($player->id, $mockGameId, $line),
                     default => $this->generateDeterministicPrediction($player, $statType, $line)
                 };
             } catch (\Exception $e) {
@@ -727,11 +730,11 @@ class WnbaPredictionsController extends Controller
                 $prediction = $this->generateDeterministicPrediction($player, $statType, $line);
             }
 
-            // Calculate recommendation with proper logic
-            $predictedValue = $prediction['predicted_value'] ?? $line;
-            $confidence = $prediction['confidence'] ?? 0.75;
-            $overProbability = $prediction['over_probability'] ?? 0.5;
-            $underProbability = $prediction['under_probability'] ?? (1 - $overProbability);
+            // Extract values from prediction response structure
+            $predictedValue = $prediction['prediction']['adjusted_value'] ?? $prediction['predicted_value'] ?? $line;
+            $confidence = $prediction['prediction']['confidence'] ?? $prediction['confidence'] ?? 0.75;
+            $overProbability = $prediction['probabilities']['over'] ?? $prediction['over_probability'] ?? 0.5;
+            $underProbability = $prediction['probabilities']['under'] ?? $prediction['under_probability'] ?? (1 - $overProbability);
 
             // Calculate the difference between prediction and line
             $difference = $predictedValue - $line;
@@ -741,26 +744,33 @@ class WnbaPredictionsController extends Controller
             $recommendation = 'avoid';
             $expectedValue = 0;
 
-            if ($confidence >= 0.6) { // Only recommend if we have reasonable confidence
-                if ($difference > 0.5 && $overProbability > 0.55) {
+            if ($confidence >= 0.55) { // Only recommend if we have reasonable confidence
+                if ($difference > 0.3 && $overProbability > 0.53) {
                     // Predicted value significantly higher than line
                     $recommendation = 'over';
                     // EV calculation: (probability of winning * payout) - (probability of losing * stake)
                     // Assuming -110 odds (52.38% breakeven), so we need >52.38% to be profitable
                     $expectedValue = ($overProbability - 0.5238) * $confidence;
-                } elseif ($difference < -0.5 && $underProbability > 0.55) {
+                } elseif ($difference < -0.3 && $underProbability > 0.53) {
                     // Predicted value significantly lower than line
                     $recommendation = 'under';
                     $expectedValue = ($underProbability - 0.5238) * $confidence;
                 } else {
-                    // Close to line or low confidence
-                    $recommendation = 'avoid';
-                    $expectedValue = 0;
+                    // Close to line or low confidence - but check for high confidence small edges
+                    if ($confidence >= 0.7) {
+                        if ($difference > 0.1 && $overProbability > 0.52) {
+                            $recommendation = 'over';
+                            $expectedValue = ($overProbability - 0.5238) * $confidence * 0.7; // Reduced EV for smaller edge
+                        } elseif ($difference < -0.1 && $underProbability > 0.52) {
+                            $recommendation = 'under';
+                            $expectedValue = ($underProbability - 0.5238) * $confidence * 0.7;
+                        }
+                    }
                 }
             }
 
-            // For very strong predictions, upgrade recommendation
-            if ($confidence >= 0.8 && $percentageDifference > 0.15) {
+            // For very strong predictions, keep existing logic but lower threshold
+            if ($confidence >= 0.75 && $percentageDifference > 0.12) { // Reduced from 0.8 and 0.15
                 if ($difference > 0) {
                     $recommendation = 'over';
                     $expectedValue = ($overProbability - 0.5238) * $confidence;

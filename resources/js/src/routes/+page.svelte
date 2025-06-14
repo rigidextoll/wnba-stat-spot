@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { api } from '$lib/api/client';
     import DefaultLayout from "$lib/layouts/DefaultLayout.svelte";
+    import TodaysBestProps from "$lib/components/TodaysBestProps.svelte";
 
     let dashboardData = {
         totalPlayers: 0,
@@ -115,6 +116,13 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Todays Best Props -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <TodaysBestProps />
             </div>
         </div>
 

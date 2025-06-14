@@ -94,9 +94,10 @@
 
     async function analyzePlayer(playerId: string) {
         try {
-            const analytics = await api.wnba.analytics.getPlayer(playerId);
-            console.log('Player Analytics:', analytics);
-            // You could show a modal or navigate to a detailed view here
+            const response = await api.wnba.analytics.getPlayer(playerId);
+            if (response.success) {
+                return response.data;
+            }
         } catch (err) {
             console.error('Failed to analyze player:', err);
         }

@@ -14,6 +14,18 @@ class BettingRecommendationService
     }
 
     /**
+     * Ensure value is positive and rounded to nearest .5 increment
+     */
+    private function ensurePositiveAndRoundToHalf(float $value): float
+    {
+        // Ensure positive value (minimum 0.5)
+        $positiveValue = max(0.5, abs($value));
+
+        // Round to nearest .5 increment
+        return round($positiveValue * 2) / 2;
+    }
+
+    /**
      * Get betting recommendation for a specific prop
      */
     public function getRecommendation(
@@ -56,29 +68,28 @@ class BettingRecommendationService
                 'player_id' => $playerId,
                 'stat_type' => $statType,
                 'line' => $line,
-                'predicted_value' => round($predictedValue, 2),
-                'confidence' => round($confidence, 3),
-                'over_probability' => round($overProbability, 3),
-                'under_probability' => round($underProbability, 3),
-                'expected_value_over' => round($evOver, 3),
-                'expected_value_under' => round($evUnder, 3),
+                'predicted_value' => $this->ensurePositiveAndRoundToHalf($predictedValue),
+                'confidence' => $confidence,
+                'over_probability' => $overProbability,
+                'under_probability' => $underProbability,
+                'odds_over' => $oddsOver,
+                'odds_under' => $oddsUnder,
+                'expected_value_over' => $evOver,
+                'expected_value_under' => $evUnder,
                 'recommendation' => $recommendation['action'],
-                'reasoning' => $recommendation['reasoning'],
-                'odds' => [
-                    'over' => $oddsOver,
-                    'under' => $oddsUnder
-                ],
-                'generated_at' => now()->toISOString()
+                'reasoning' => $this->getRecommendationReasoning($recommendation['action'], $confidence, $evOver, $evUnder),
+                'timestamp' => now()->toISOString()
             ];
 
         } catch (\Exception $e) {
             Log::error('Error generating betting recommendation', [
-                'error' => $e->getMessage(),
                 'player_id' => $playerId,
                 'stat_type' => $statType,
-                'line' => $line
+                'line' => $line,
+                'error' => $e->getMessage()
             ]);
-            return $this->getEmptyRecommendation($playerId, $statType, $line, $oddsOver, $oddsUnder, $e->getMessage());
+
+            return $this->getEmptyRecommendation($playerId, $statType, $line, $oddsOver, $oddsUnder);
         }
     }
 
@@ -108,8 +119,9 @@ class BettingRecommendationService
         float $predictedValue,
         float $line
     ): array {
-        $minConfidence = 0.7;
-        $minEdge = 0.05;
+        // Reduced thresholds for more realistic recommendations
+        $minConfidence = 0.55; // Was 0.7 (70%) - now 55% for more reasonable filtering
+        $minEdge = 0.02; // Was 0.05 (5%) - now 2% for more realistic edge detection
 
         if ($confidence < $minConfidence) {
             return [
@@ -118,7 +130,14 @@ class BettingRecommendationService
             ];
         }
 
-        if ($evOver > $minEdge) {
+        // Check for significant directional edge (prediction vs line difference)
+        $predictionDifference = abs($predictedValue - $line);
+        $significantDifference = $predictionDifference > ($line * 0.1); // 10% difference threshold
+
+        // If we have a strong directional prediction, lower the EV requirement
+        $adjustedMinEdge = $significantDifference ? max(0.01, $minEdge * 0.5) : $minEdge;
+
+        if ($evOver > $adjustedMinEdge) {
             return [
                 'action' => 'over',
                 'reasoning' => sprintf(
@@ -130,7 +149,7 @@ class BettingRecommendationService
             ];
         }
 
-        if ($evUnder > $minEdge) {
+        if ($evUnder > $adjustedMinEdge) {
             return [
                 'action' => 'under',
                 'reasoning' => sprintf(
@@ -140,6 +159,31 @@ class BettingRecommendationService
                     $evUnder * 100
                 )
             ];
+        }
+
+        // If we have high confidence but low EV, still consider direction
+        if ($confidence >= 0.65 && $significantDifference) {
+            if ($predictedValue > $line && $evOver > -0.02) {
+                return [
+                    'action' => 'over',
+                    'reasoning' => sprintf(
+                        'High confidence directional play: %.1f predicted vs %.1f line',
+                        $predictedValue,
+                        $line
+                    )
+                ];
+            }
+
+            if ($predictedValue < $line && $evUnder > -0.02) {
+                return [
+                    'action' => 'under',
+                    'reasoning' => sprintf(
+                        'High confidence directional play: %.1f predicted vs %.1f line',
+                        $predictedValue,
+                        $line
+                    )
+                ];
+            }
         }
 
         return [
@@ -177,5 +221,19 @@ class BettingRecommendationService
             ],
             'generated_at' => now()->toISOString()
         ];
+    }
+
+    private function getRecommendationReasoning(string $action, float $confidence, float $evOver, float $evUnder): string
+    {
+        switch ($action) {
+            case 'over':
+                return "Recommend OVER based on {$confidence}% confidence and positive expected value of {$evOver}%";
+            case 'under':
+                return "Recommend UNDER based on {$confidence}% confidence and positive expected value of {$evUnder}%";
+            case 'avoid':
+                return "Avoid this bet due to low confidence ({$confidence}%) or negative expected values";
+            default:
+                return "No clear recommendation available";
+        }
     }
 }

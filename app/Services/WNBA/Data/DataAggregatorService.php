@@ -273,9 +273,10 @@ class DataAggregatorService
                     'situational_analysis' => $this->analyzeSituationalPerformance($games, $statType),
                     'opponent_impact' => $this->analyzeOpponentImpact($games, $statType),
                     'trend_analysis' => $this->analyzeTrends($statValues),
-                    'consistency_metrics' => $this->calculateConsistency($statValues),
+                    'consistency_metrics' => $this->calculateConsistencyMetricsForProp($statValues),
                     'outlier_analysis' => $this->analyzeOutliers($statValues),
-                    'prediction_inputs' => $this->preparePredictionInputs($games, $statType)
+                    'prediction_inputs' => $this->preparePredictionInputs($games, $statType),
+                    'games_played' => $games->count()
                 ];
 
             } catch (\Exception $e) {
@@ -436,11 +437,11 @@ class DataAggregatorService
         ];
     }
 
-    private function calculateTrend(array $values): float
+    private function calculateTrend($values): float
     {
-        $n = count($values);
-        if ($n < 2) return 0;
+        if (empty($values) || count($values) < 2) return 0;
 
+        $n = count($values);
         $x = range(1, $n);
         $sumX = array_sum($x);
         $sumY = array_sum($values);
@@ -452,8 +453,9 @@ class DataAggregatorService
             $sumX2 += $x[$i] * $x[$i];
         }
 
-        $denominator = $n * $sumX2 - $sumX * $sumX;
-        return $denominator != 0 ? ($n * $sumXY - $sumX * $sumY) / $denominator : 0;
+        if ($n * $sumX2 - $sumX * $sumX == 0) return 0;
+
+        return ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
     }
 
     private function calculateConsistency(array $values): float
@@ -609,13 +611,357 @@ class DataAggregatorService
     private function getLeagueContext($season): array { return []; }
 
     // Prop-related methods
-    private function analyzeStatDistribution($values): array { return []; }
-    private function analyzeHistoricalPerformance($games, $statType): array { return []; }
-    private function analyzeSituationalPerformance($games, $statType): array { return []; }
-    private function analyzeOpponentImpact($games, $statType): array { return []; }
-    private function analyzeTrends($values): array { return []; }
-    private function analyzeOutliers($values): array { return []; }
-    private function preparePredictionInputs($games, $statType): array { return []; }
+    private function analyzeStatDistribution($values): array
+    {
+        if (empty($values)) {
+            return [
+                'mean' => 0,
+                'median' => 0,
+                'std_dev' => 0,
+                'variance' => 0,
+                'min' => 0,
+                'max' => 0,
+                'count' => 0,
+                'values' => [],
+                'percentiles' => []
+            ];
+        }
+
+        $count = count($values);
+        $mean = array_sum($values) / $count;
+
+        // Calculate variance and standard deviation
+        $variance = 0;
+        foreach ($values as $value) {
+            $variance += pow($value - $mean, 2);
+        }
+        $variance = $variance / $count;
+        $stdDev = sqrt($variance);
+
+        // Sort for percentiles and median
+        sort($values);
+        $median = $count % 2 === 0
+            ? ($values[$count/2 - 1] + $values[$count/2]) / 2
+            : $values[floor($count/2)];
+
+        return [
+            'mean' => round($mean, 2),
+            'median' => round($median, 2),
+            'std_dev' => round($stdDev, 2),
+            'variance' => round($variance, 2),
+            'min' => min($values),
+            'max' => max($values),
+            'count' => $count,
+            'values' => $values,
+            'percentiles' => $this->calculatePercentiles($values)
+        ];
+    }
+
+    private function analyzeHistoricalPerformance($games, $statType): array
+    {
+        if ($games->isEmpty()) {
+            return [
+                'season_average' => 0,
+                'recent_average' => 0,
+                'games_played' => 0,
+                'consistency_score' => 0
+            ];
+        }
+
+        $statValues = $games->pluck($statType)->filter()->toArray();
+        $seasonAverage = !empty($statValues) ? array_sum($statValues) / count($statValues) : 0;
+
+        // Get recent 5 games average
+        $recentGames = $games->take(5);
+        $recentValues = $recentGames->pluck($statType)->filter()->toArray();
+        $recentAverage = !empty($recentValues) ? array_sum($recentValues) / count($recentValues) : 0;
+
+        // Calculate consistency (inverse of coefficient of variation)
+        $consistency = 0;
+        if (!empty($statValues) && $seasonAverage > 0) {
+            $variance = 0;
+            foreach ($statValues as $value) {
+                $variance += pow($value - $seasonAverage, 2);
+            }
+            $stdDev = sqrt($variance / count($statValues));
+            $coefficientOfVariation = $stdDev / $seasonAverage;
+            $consistency = max(0, 1 - $coefficientOfVariation); // Higher is more consistent
+        }
+
+        return [
+            'season_average' => round($seasonAverage, 2),
+            'recent_average' => round($recentAverage, 2),
+            'games_played' => $games->count(),
+            'consistency_score' => round($consistency, 3),
+            'trend' => $this->calculateTrend($statValues)
+        ];
+    }
+
+    private function analyzeSituationalPerformance($games, $statType): array
+    {
+        if ($games->isEmpty()) {
+            return [
+                'home' => ['average' => 0, 'games' => 0],
+                'away' => ['average' => 0, 'games' => 0],
+                'vs_top_teams' => ['average' => 0, 'games' => 0],
+                'back_to_back' => ['average' => 0, 'games' => 0]
+            ];
+        }
+
+        $homeGames = $games->filter(function($game) {
+            return $this->getHomeAway($game) === 'home';
+        });
+
+        $awayGames = $games->filter(function($game) {
+            return $this->getHomeAway($game) === 'away';
+        });
+
+        return [
+            'home' => [
+                'average' => $homeGames->isEmpty() ? 0 : round($homeGames->avg($statType), 2),
+                'games' => $homeGames->count()
+            ],
+            'away' => [
+                'average' => $awayGames->isEmpty() ? 0 : round($awayGames->avg($statType), 2),
+                'games' => $awayGames->count()
+            ],
+            'vs_top_teams' => [
+                'average' => 0, // Would need opponent strength data
+                'games' => 0
+            ],
+            'back_to_back' => [
+                'average' => 0, // Would need game scheduling data
+                'games' => 0
+            ]
+        ];
+    }
+
+    private function analyzeOpponentImpact($games, $statType): array
+    {
+        if ($games->isEmpty()) {
+            return [
+                'vs_strong_defense' => ['average' => 0, 'games' => 0],
+                'vs_weak_defense' => ['average' => 0, 'games' => 0],
+                'opponent_adjustment' => 1.0
+            ];
+        }
+
+        // For now, return basic structure - would need opponent defensive ratings
+        return [
+            'vs_strong_defense' => [
+                'average' => round($games->avg($statType), 2),
+                'games' => $games->count()
+            ],
+            'vs_weak_defense' => [
+                'average' => round($games->avg($statType), 2),
+                'games' => $games->count()
+            ],
+            'opponent_adjustment' => 1.0 // Neutral adjustment for now
+        ];
+    }
+
+    private function analyzeTrends($values): array
+    {
+        if (empty($values) || count($values) < 3) {
+            return [
+                'direction' => 'stable',
+                'slope' => 0,
+                'strength' => 0,
+                'recent_form' => 'average'
+            ];
+        }
+
+        // Calculate linear trend
+        $n = count($values);
+        $x = range(1, $n);
+        $sumX = array_sum($x);
+        $sumY = array_sum($values);
+        $sumXY = 0;
+        $sumX2 = 0;
+
+        for ($i = 0; $i < $n; $i++) {
+            $sumXY += $x[$i] * $values[$i];
+            $sumX2 += $x[$i] * $x[$i];
+        }
+
+        $slope = ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
+
+        // Determine trend direction and strength
+        $direction = abs($slope) < 0.1 ? 'stable' : ($slope > 0 ? 'improving' : 'declining');
+        $strength = min(1, abs($slope) / (array_sum($values) / $n)); // Normalize by average
+
+        // Recent form (last 3 games vs season average)
+        $recentValues = array_slice($values, -3);
+        $recentAvg = array_sum($recentValues) / count($recentValues);
+        $seasonAvg = array_sum($values) / count($values);
+
+        $recentForm = 'average';
+        if ($recentAvg > $seasonAvg * 1.1) {
+            $recentForm = 'hot';
+        } elseif ($recentAvg < $seasonAvg * 0.9) {
+            $recentForm = 'cold';
+        }
+
+        return [
+            'direction' => $direction,
+            'slope' => round($slope, 3),
+            'strength' => round($strength, 3),
+            'recent_form' => $recentForm
+        ];
+    }
+
+    private function calculateConsistencyMetricsForProp($values): array
+    {
+        if (empty($values)) {
+            return [
+                'coefficient_of_variation' => 0,
+                'consistency_score' => 0,
+                'volatility' => 'unknown'
+            ];
+        }
+
+        $mean = array_sum($values) / count($values);
+        $variance = 0;
+
+        foreach ($values as $value) {
+            $variance += pow($value - $mean, 2);
+        }
+
+        $stdDev = sqrt($variance / count($values));
+        $coefficientOfVariation = $mean > 0 ? $stdDev / $mean : 0;
+        $consistencyScore = max(0, 1 - $coefficientOfVariation);
+
+        $volatility = 'low';
+        if ($coefficientOfVariation > 0.5) {
+            $volatility = 'high';
+        } elseif ($coefficientOfVariation > 0.3) {
+            $volatility = 'medium';
+        }
+
+        return [
+            'coefficient_of_variation' => round($coefficientOfVariation, 3),
+            'consistency_score' => round($consistencyScore, 3),
+            'volatility' => $volatility
+        ];
+    }
+
+    private function analyzeOutliers($values): array
+    {
+        if (empty($values) || count($values) < 4) {
+            return [
+                'outliers' => [],
+                'outlier_count' => 0,
+                'outlier_percentage' => 0
+            ];
+        }
+
+        sort($values);
+        $q1 = $this->calculatePercentile($values, 25);
+        $q3 = $this->calculatePercentile($values, 75);
+        $iqr = $q3 - $q1;
+
+        $lowerBound = $q1 - 1.5 * $iqr;
+        $upperBound = $q3 + 1.5 * $iqr;
+
+        $outliers = array_filter($values, function($value) use ($lowerBound, $upperBound) {
+            return $value < $lowerBound || $value > $upperBound;
+        });
+
+        return [
+            'outliers' => array_values($outliers),
+            'outlier_count' => count($outliers),
+            'outlier_percentage' => round((count($outliers) / count($values)) * 100, 1),
+            'lower_bound' => round($lowerBound, 2),
+            'upper_bound' => round($upperBound, 2)
+        ];
+    }
+
+    private function preparePredictionInputs($games, $statType): array
+    {
+        if ($games->isEmpty()) {
+            return [
+                'feature_vector' => [],
+                'target_values' => [],
+                'weights' => []
+            ];
+        }
+
+        $statValues = $games->pluck($statType)->filter()->toArray();
+        $minutes = $games->pluck('minutes')->filter()->toArray();
+
+        // Create feature vector for prediction model
+        $features = [];
+        foreach ($games as $index => $game) {
+            $features[] = [
+                'minutes' => $game->minutes ?? 0,
+                'home_away' => $this->getHomeAway($game) === 'home' ? 1 : 0,
+                'rest_days' => 1, // Would calculate from game dates
+                'game_number' => $index + 1,
+                'season_progress' => ($index + 1) / $games->count()
+            ];
+        }
+
+        // Calculate recency weights (more recent games weighted higher)
+        $weights = [];
+        $totalGames = count($statValues);
+        for ($i = 0; $i < $totalGames; $i++) {
+            $weights[] = ($i + 1) / $totalGames; // Linear weighting
+        }
+
+        return [
+            'feature_vector' => $features,
+            'target_values' => $statValues,
+            'weights' => $weights,
+            'sample_size' => count($statValues)
+        ];
+    }
+
+    // Helper method for percentile calculation
+    private function calculatePercentile($values, $percentile): float
+    {
+        if (empty($values)) return 0;
+
+        sort($values);
+        $count = count($values);
+        $index = ($percentile / 100) * ($count - 1);
+
+        // Ensure index is within bounds
+        if ($index < 0) {
+            return $values[0];
+        }
+        if ($index >= $count) {
+            return $values[$count - 1];
+        }
+
+        if (floor($index) == $index) {
+            return $values[(int)$index];
+        } else {
+            $lowerIndex = (int)floor($index);
+            $upperIndex = (int)ceil($index);
+
+            // Ensure both indices are within bounds
+            $lowerIndex = max(0, min($lowerIndex, $count - 1));
+            $upperIndex = max(0, min($upperIndex, $count - 1));
+
+            $lower = $values[$lowerIndex];
+            $upper = $values[$upperIndex];
+            return $lower + ($upper - $lower) * ($index - floor($index));
+        }
+    }
+
+    // Helper method for calculating percentiles array
+    private function calculatePercentiles($values): array
+    {
+        if (empty($values)) return [];
+
+        return [
+            '10th' => $this->calculatePercentile($values, 10),
+            '25th' => $this->calculatePercentile($values, 25),
+            '50th' => $this->calculatePercentile($values, 50),
+            '75th' => $this->calculatePercentile($values, 75),
+            '90th' => $this->calculatePercentile($values, 90)
+        ];
+    }
 
     // Empty data methods
     private function getEmptyPlayerData(): array
@@ -636,5 +982,52 @@ class DataAggregatorService
     private function getEmptyGameData(): array { return []; }
     private function getEmptyMatchupData(): array { return []; }
     private function getEmptyLeagueData(): array { return []; }
-    private function getEmptyPropData(): array { return []; }
+    private function getEmptyPropData(): array
+    {
+        return [
+            'stat_distribution' => [
+                'mean' => 0,
+                'median' => 0,
+                'std_dev' => 0,
+                'variance' => 0,
+                'min' => 0,
+                'max' => 0,
+                'count' => 0,
+                'values' => [],
+                'percentiles' => []
+            ],
+            'historical_performance' => [
+                'season_average' => 0,
+                'recent_average' => 0,
+                'games_played' => 0,
+                'consistency_score' => 0
+            ],
+            'situational_analysis' => [
+                'home' => ['average' => 0, 'games' => 0],
+                'away' => ['average' => 0, 'games' => 0]
+            ],
+            'opponent_impact' => [
+                'opponent_adjustment' => 1.0
+            ],
+            'trend_analysis' => [
+                'direction' => 'stable',
+                'slope' => 0,
+                'recent_form' => 'average'
+            ],
+            'consistency_metrics' => [
+                'coefficient_of_variation' => 0,
+                'consistency_score' => 0,
+                'volatility' => 'unknown'
+            ],
+            'outlier_analysis' => [
+                'outliers' => [],
+                'outlier_count' => 0
+            ],
+            'prediction_inputs' => [
+                'feature_vector' => [],
+                'target_values' => [],
+                'sample_size' => 0
+            ]
+        ];
+    }
 }
