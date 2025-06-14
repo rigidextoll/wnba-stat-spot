@@ -119,8 +119,9 @@ class BettingRecommendationService
         float $predictedValue,
         float $line
     ): array {
-        $minConfidence = 0.7;
-        $minEdge = 0.05;
+        // Reduced thresholds for more realistic recommendations
+        $minConfidence = 0.55; // Was 0.7 (70%) - now 55% for more reasonable filtering
+        $minEdge = 0.02; // Was 0.05 (5%) - now 2% for more realistic edge detection
 
         if ($confidence < $minConfidence) {
             return [
@@ -129,7 +130,14 @@ class BettingRecommendationService
             ];
         }
 
-        if ($evOver > $minEdge) {
+        // Check for significant directional edge (prediction vs line difference)
+        $predictionDifference = abs($predictedValue - $line);
+        $significantDifference = $predictionDifference > ($line * 0.1); // 10% difference threshold
+
+        // If we have a strong directional prediction, lower the EV requirement
+        $adjustedMinEdge = $significantDifference ? max(0.01, $minEdge * 0.5) : $minEdge;
+
+        if ($evOver > $adjustedMinEdge) {
             return [
                 'action' => 'over',
                 'reasoning' => sprintf(
@@ -141,7 +149,7 @@ class BettingRecommendationService
             ];
         }
 
-        if ($evUnder > $minEdge) {
+        if ($evUnder > $adjustedMinEdge) {
             return [
                 'action' => 'under',
                 'reasoning' => sprintf(
@@ -151,6 +159,31 @@ class BettingRecommendationService
                     $evUnder * 100
                 )
             ];
+        }
+
+        // If we have high confidence but low EV, still consider direction
+        if ($confidence >= 0.65 && $significantDifference) {
+            if ($predictedValue > $line && $evOver > -0.02) {
+                return [
+                    'action' => 'over',
+                    'reasoning' => sprintf(
+                        'High confidence directional play: %.1f predicted vs %.1f line',
+                        $predictedValue,
+                        $line
+                    )
+                ];
+            }
+
+            if ($predictedValue < $line && $evUnder > -0.02) {
+                return [
+                    'action' => 'under',
+                    'reasoning' => sprintf(
+                        'High confidence directional play: %.1f predicted vs %.1f line',
+                        $predictedValue,
+                        $line
+                    )
+                ];
+            }
         }
 
         return [

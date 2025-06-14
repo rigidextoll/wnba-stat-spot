@@ -744,26 +744,33 @@ class WnbaPredictionsController extends Controller
             $recommendation = 'avoid';
             $expectedValue = 0;
 
-            if ($confidence >= 0.6) { // Only recommend if we have reasonable confidence
-                if ($difference > 0.5 && $overProbability > 0.55) {
+            if ($confidence >= 0.55) { // Only recommend if we have reasonable confidence
+                if ($difference > 0.3 && $overProbability > 0.53) {
                     // Predicted value significantly higher than line
                     $recommendation = 'over';
                     // EV calculation: (probability of winning * payout) - (probability of losing * stake)
                     // Assuming -110 odds (52.38% breakeven), so we need >52.38% to be profitable
                     $expectedValue = ($overProbability - 0.5238) * $confidence;
-                } elseif ($difference < -0.5 && $underProbability > 0.55) {
+                } elseif ($difference < -0.3 && $underProbability > 0.53) {
                     // Predicted value significantly lower than line
                     $recommendation = 'under';
                     $expectedValue = ($underProbability - 0.5238) * $confidence;
                 } else {
-                    // Close to line or low confidence
-                    $recommendation = 'avoid';
-                    $expectedValue = 0;
+                    // Close to line or low confidence - but check for high confidence small edges
+                    if ($confidence >= 0.7) {
+                        if ($difference > 0.1 && $overProbability > 0.52) {
+                            $recommendation = 'over';
+                            $expectedValue = ($overProbability - 0.5238) * $confidence * 0.7; // Reduced EV for smaller edge
+                        } elseif ($difference < -0.1 && $underProbability > 0.52) {
+                            $recommendation = 'under';
+                            $expectedValue = ($underProbability - 0.5238) * $confidence * 0.7;
+                        }
+                    }
                 }
             }
 
-            // For very strong predictions, upgrade recommendation
-            if ($confidence >= 0.8 && $percentageDifference > 0.15) {
+            // For very strong predictions, keep existing logic but lower threshold
+            if ($confidence >= 0.75 && $percentageDifference > 0.12) { // Reduced from 0.8 and 0.15
                 if ($difference > 0) {
                     $recommendation = 'over';
                     $expectedValue = ($overProbability - 0.5238) * $confidence;

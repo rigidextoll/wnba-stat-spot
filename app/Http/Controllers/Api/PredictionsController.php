@@ -649,7 +649,17 @@ class PredictionsController extends Controller
         $predictedValue = $prediction['prediction']['predicted_value'] ?? $line;
         $confidence = $prediction['prediction']['confidence_score'] ?? 0.5;
 
-        if ($confidence < 0.6) {
+        // Reduced from 0.6 to 0.55 for more realistic recommendations
+        if ($confidence < 0.55) {
+            return 'avoid';
+        }
+
+        // Consider both direction and confidence
+        $difference = abs($predictedValue - $line);
+        $significantDifference = $difference > ($line * 0.08); // 8% difference threshold
+
+        // If prediction is very close to line, be more cautious
+        if (!$significantDifference && $confidence < 0.65) {
             return 'avoid';
         }
 
