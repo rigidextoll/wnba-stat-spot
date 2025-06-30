@@ -9,7 +9,8 @@
     onMount(async () => {
 
         const loaderOptions: LoaderOptions = {};
-        const loader = new Loader('AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao', loaderOptions);
+        // Note: Google Maps API key should be moved to server-side configuration
+        const loader = new Loader('YOUR_GOOGLE_MAPS_API_KEY', loaderOptions);
 
         const google = await loader.load();
 

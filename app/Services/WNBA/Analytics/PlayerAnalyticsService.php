@@ -7,6 +7,7 @@ use App\Models\WnbaGame;
 use App\Models\WnbaGameTeam;
 use App\Models\WnbaPlayer;
 use App\Models\WnbaTeam;
+use App\Utils\StatisticsCalculator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
@@ -33,7 +34,7 @@ class PlayerAnalyticsService
             return $this->getEmptyFormData();
         }
 
-        $stats = $this->calculateFormStats($recentGames);
+        $stats = StatisticsCalculator::calculatePlayerAverages($recentGames);
         $trends = $this->calculateTrends($recentGames);
 
         return [
@@ -78,21 +79,9 @@ class PlayerAnalyticsService
         return [
             'games_played' => $games->count(),
             'avg_minutes' => round($totalMinutes / $games->count(), 1),
-            'per_36_stats' => [
-                'points' => round($games->avg('points') * $per36Multiplier, 1),
-                'rebounds' => round($games->avg('rebounds') * $per36Multiplier, 1),
-                'assists' => round($games->avg('assists') * $per36Multiplier, 1),
-                'steals' => round($games->avg('steals') * $per36Multiplier, 1),
-                'blocks' => round($games->avg('blocks') * $per36Multiplier, 1),
-                'turnovers' => round($games->avg('turnovers') * $per36Multiplier, 1),
-                'field_goals_made' => round($games->avg('field_goals_made') * $per36Multiplier, 1),
-                'field_goals_attempted' => round($games->avg('field_goals_attempted') * $per36Multiplier, 1),
-                'three_point_made' => round($games->avg('three_point_field_goals_made') * $per36Multiplier, 1),
-                'three_point_attempted' => round($games->avg('three_point_field_goals_attempted') * $per36Multiplier, 1),
-                'free_throws_made' => round($games->avg('free_throws_made') * $per36Multiplier, 1),
-                'free_throws_attempted' => round($games->avg('free_throws_attempted') * $per36Multiplier, 1)
-            ],
-            'efficiency_metrics' => $this->calculateEfficiencyMetrics($games)
+            'per_36_stats' => $this->calculatePer36Stats($games, $per36Multiplier),
+            'efficiency_metrics' => StatisticsCalculator::calculateEfficiencyMetrics($games),
+            'shooting_percentages' => StatisticsCalculator::calculateShootingPercentages($games)
         ];
     }
 

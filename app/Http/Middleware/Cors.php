@@ -17,10 +17,21 @@ class Cors
     {
         $response = $next($request);
 
-        $response->headers->set('Access-Control-Allow-Origin', '*');
+        // Use environment variable for allowed origins instead of wildcard
+        $allowedOrigins = env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:8000');
+        $origins = explode(',', $allowedOrigins);
+        $origin = $request->header('Origin');
+        
+        if (in_array($origin, $origins)) {
+            $response->headers->set('Access-Control-Allow-Origin', $origin);
+        }
+        
         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
         $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-        $response->headers->set('Access-Control-Allow-Credentials', 'true');
+        // Only allow credentials with specific origins, not wildcard
+        if (in_array($origin, $origins)) {
+            $response->headers->set('Access-Control-Allow-Credentials', 'true');
+        }
 
         if ($request->getMethod() === 'OPTIONS') {
             $response->setStatusCode(200);

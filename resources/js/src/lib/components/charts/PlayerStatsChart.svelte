@@ -1,104 +1,106 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import Chart from 'chart.js/auto';
-    import type { ChartConfiguration } from 'chart.js';
+    import BaseChart from './BaseChart.svelte';
+    import type { ChartData, ChartOptions } from 'chart.js';
 
     export let data: { date: string; value: number }[] = [];
     export let statName: string = '';
     export let lineColor: string = '#3b82f6';
     export let backgroundColor: string = 'rgba(59, 130, 246, 0.1)';
     export let height: string = '300px';
+    export let loading: boolean = false;
+    export let error: string | null = null;
 
-    let canvas: HTMLCanvasElement;
-    let chart: Chart;
+    let baseChart: BaseChart;
 
-    onMount(() => {
-        if (!canvas || !data.length) return;
+    // Transform data for Chart.js
+    $: chartData = {
+        labels: data.map(d => d.date),
+        datasets: [{
+            label: statName,
+            data: data.map(d => d.value),
+            borderColor: lineColor,
+            backgroundColor: backgroundColor,
+            tension: 0.4,
+            fill: true,
+            borderWidth: 2,
+            pointBackgroundColor: lineColor,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+        }]
+    } as ChartData<'line'>;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const config: ChartConfiguration = {
-            type: 'line',
-            data: {
-                labels: data.map(d => d.date),
-                datasets: [{
-                    label: statName,
-                    data: data.map(d => d.value),
-                    borderColor: lineColor,
-                    backgroundColor: backgroundColor,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                }]
+    // Chart options specific to player stats
+    const chartOptions: ChartOptions<'line'> = {
+        scales: {
+            x: {
+                grid: {
+                    display: false,
+                },
+                ticks: {
+                    maxTicksLimit: 8,
+                },
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {
-                            label: (context) => {
-                                return `${statName}: ${context.parsed.y.toFixed(1)}`;
-                            }
-                        }
-                    }
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.1)',
                 },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
-                    }
+                ticks: {
+                    stepSize: 1,
                 },
-                interaction: {
-                    mode: 'nearest',
-                    axis: 'x',
-                    intersect: false
-                }
-            }
-        };
+            },
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#ffffff',
+                bodyColor: '#ffffff',
+                borderColor: lineColor,
+                borderWidth: 1,
+            },
+        },
+        interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false,
+        },
+        elements: {
+            point: {
+                hoverBackgroundColor: lineColor,
+            },
+        },
+    };
 
-        chart = new Chart(ctx, config);
+    // Export functions to parent components
+    export function refreshChart() {
+        if (baseChart) {
+            baseChart.refreshChart();
+        }
+    }
 
-        return () => {
-            if (chart) {
-                chart.destroy();
-            }
-        };
-    });
-
-    $: if (chart && data) {
-        chart.data.labels = data.map(d => d.date);
-        chart.data.datasets[0].data = data.map(d => d.value);
-        chart.update();
+    export function exportChart(format: 'png' | 'jpeg' = 'png') {
+        if (baseChart) {
+            return baseChart.exportChart(format);
+        }
+        return null;
     }
 </script>
 
-<div class="chart-container" style="height: {height};">
-    <canvas bind:this={canvas}></canvas>
-</div>
-
-<style>
-    .chart-container {
-        position: relative;
-        width: 100%;
-    }
-</style>
+<BaseChart
+    bind:this={baseChart}
+    title={statName ? `${statName} Trend` : 'Player Statistics'}
+    chartType="line"
+    {data}={chartData}
+    options={chartOptions}
+    {height}
+    {loading}
+    {error}
+/>

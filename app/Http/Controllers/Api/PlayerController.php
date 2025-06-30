@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\ApiResponseTrait;
+use App\Http\Traits\CacheHelper;
 use App\Models\WnbaPlayer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +14,9 @@ use Illuminate\Support\Facades\Schema;
 
 class PlayerController extends Controller
 {
-    private const CACHE_TTL = 1800; // 30 minutes
+    use ApiResponseTrait, CacheHelper;
+    protected int $defaultCacheTtl = 1800; // 30 minutes
+    protected string $cachePrefix = 'wnba_players';
     private const PER_PAGE = 100;
 
     public function index(Request $request): JsonResponse
@@ -20,7 +24,7 @@ class PlayerController extends Controller
         try {
             // Check if the table exists
             if (!Schema::hasTable('wnba_players')) {
-                return response()->json([
+                return $this->successResponse([
                     'data' => [],
                     'meta' => [
                         'current_page' => 1,
@@ -29,9 +33,8 @@ class PlayerController extends Controller
                         'total' => 0,
                         'from' => null,
                         'to' => null,
-                    ],
-                    'message' => 'Database is still being set up. Please try again in a few minutes.'
-                ]);
+                    ]
+                ], 'Database is still being set up. Please try again in a few minutes.');
             }
 
             $page = $request->get('page', 1);
@@ -61,7 +64,7 @@ class PlayerController extends Controller
                             ->paginate($perPage);
             });
 
-            return response()->json([
+            return $this->successResponse([
                 'data' => $result->items(),
                 'meta' => [
                     'current_page' => $result->currentPage(),
@@ -70,23 +73,10 @@ class PlayerController extends Controller
                     'total' => $result->total(),
                     'from' => $result->firstItem(),
                     'to' => $result->lastItem(),
-                ],
-                'message' => 'Players retrieved successfully'
-            ]);
+                ]
+            ], 'Players retrieved successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'data' => [],
-                'meta' => [
-                    'current_page' => 1,
-                    'last_page' => 1,
-                    'per_page' => 100,
-                    'total' => 0,
-                    'from' => null,
-                    'to' => null,
-                ],
-                'message' => 'Database is still being set up. Please try again in a few minutes.',
-                'error' => $e->getMessage()
-            ], 503);
+            return $this->handleException($e, 'Retrieving players');
         }
     }
 

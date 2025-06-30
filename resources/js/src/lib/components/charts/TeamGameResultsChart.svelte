@@ -1,7 +1,6 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import Chart from 'chart.js/auto';
-    import type { ChartConfiguration } from 'chart.js';
+    import BaseChart from './BaseChart.svelte';
+    import type { ChartData, ChartOptions } from 'chart.js';
 
     export let data: {
         date: string;
@@ -10,111 +9,134 @@
         result: 'W' | 'L';
         home_away: 'home' | 'away';
     }[] = [];
+    export let loading: boolean = false;
+    export let error: string | null = null;
+    export let height: string = '400px';
 
-    let canvas: HTMLCanvasElement;
-    let chart: Chart;
+    let baseChart: BaseChart;
 
-    onMount(() => {
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const chartConfig: ChartConfiguration = {
-            type: 'line',
-            data: {
-                labels: data.map(d => d.date),
-                datasets: [
-                    {
-                        label: 'Points Scored',
-                        data: data.map(d => d.points_scored),
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    },
-                    {
-                        label: 'Points Allowed',
-                        data: data.map(d => d.points_allowed),
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }
-                ]
+    // Transform data for Chart.js
+    $: chartData = {
+        labels: data.map(d => d.date),
+        datasets: [
+            {
+                label: 'Points Scored',
+                data: data.map(d => d.points_scored),
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: false,
+                borderWidth: 2,
+                pointBackgroundColor: data.map(d => d.result === 'W' ? '#10b981' : '#ef4444'),
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top'
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {
-                            label: (context) => {
-                                const game = data[context.dataIndex];
-                                return [
-                                    `${context.dataset.label}: ${context.parsed.y}`,
-                                    `Result: ${game.result}`,
-                                    `Location: ${game.home_away}`
-                                ];
-                            }
-                        }
-                    }
+            {
+                label: 'Points Allowed',
+                data: data.map(d => d.points_allowed),
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                tension: 0.4,
+                fill: false,
+                borderWidth: 2,
+                pointBackgroundColor: '#ef4444',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            }
+        ]
+    } as ChartData<'line'>;
+
+    // Chart options specific to team game results
+    const chartOptions: ChartOptions<'line'> = {
+        scales: {
+            x: {
+                grid: {
+                    display: false,
                 },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Points'
-                        }
-                    }
+                ticks: {
+                    maxTicksLimit: 10,
                 },
-                interaction: {
-                    mode: 'nearest',
-                    axis: 'x',
-                    intersect: false
+            },
+            y: {
+                beginAtZero: false,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.1)',
+                },
+                ticks: {
+                    stepSize: 10,
+                },
+                title: {
+                    display: true,
+                    text: 'Points',
+                },
+            },
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#ffffff',
+                bodyColor: '#ffffff',
+                callbacks: {
+                    afterBody: function(context) {
+                        const index = context[0].dataIndex;
+                        const gameData = data[index];
+                        return [
+                            `Result: ${gameData.result}`,
+                            `Location: ${gameData.home_away === 'home' ? 'Home' : 'Away'}`,
+                            `Point Diff: ${gameData.points_scored - gameData.points_allowed > 0 ? '+' : ''}${gameData.points_scored - gameData.points_allowed}`
+                        ];
+                    }
                 }
-            }
-        };
+            },
+        },
+        interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false,
+        },
+        elements: {
+            point: {
+                hoverBackgroundColor: function(context) {
+                    const index = context.dataIndex;
+                    const gameData = data[index];
+                    return gameData?.result === 'W' ? '#10b981' : '#ef4444';
+                },
+            },
+        },
+    };
 
-        chart = new Chart(ctx, chartConfig);
+    // Export functions to parent components
+    export function refreshChart() {
+        if (baseChart) {
+            baseChart.refreshChart();
+        }
+    }
 
-        return () => {
-            if (chart) {
-                chart.destroy();
-            }
-        };
-    });
-
-    $: if (chart && data) {
-        chart.data.labels = data.map(d => d.date);
-        chart.data.datasets[0].data = data.map(d => d.points_scored);
-        chart.data.datasets[1].data = data.map(d => d.points_allowed);
-        chart.update();
+    export function exportChart(format: 'png' | 'jpeg' = 'png') {
+        if (baseChart) {
+            return baseChart.exportChart(format);
+        }
+        return null;
     }
 </script>
 
-<div class="chart-container" style="position: relative; height: 400px;">
-    <canvas bind:this={canvas}></canvas>
-</div>
-
-<style>
-    .chart-container {
-        background: white;
-        border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-</style>
+<BaseChart
+    bind:this={baseChart}
+    title="Team Game Results"
+    chartType="line"
+    data={chartData}
+    options={chartOptions}
+    {height}
+    {loading}
+    {error}
+/>

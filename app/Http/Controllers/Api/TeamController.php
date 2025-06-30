@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\ApiResponseTrait;
+use App\Http\Traits\CacheHelper;
 use App\Models\WnbaTeam;
 use App\Models\WnbaPlayer;
 use App\Models\WnbaPlayerGame;
@@ -13,18 +15,19 @@ use Illuminate\Support\Facades\Schema;
 
 class TeamController extends Controller
 {
-    private const CACHE_TTL = 3600 * 2; // 1 hour (teams change less frequently)
+    use ApiResponseTrait, CacheHelper;
+    protected int $defaultCacheTtl = 7200; // 2 hours (teams change less frequently)
+    protected string $cachePrefix = 'wnba_teams';
 
     public function index(Request $request): JsonResponse
     {
         try {
             // Check if the table exists
             if (!Schema::hasTable('wnba_teams')) {
-                return response()->json([
+                return $this->successResponse([
                     'data' => [],
-                    'meta' => ['total' => 0],
-                    'message' => 'Database is still being set up. Please try again in a few minutes.'
-                ]);
+                    'meta' => ['total' => 0]
+                ], 'Database is still being set up. Please try again in a few minutes.');
             }
 
             $query = WnbaTeam::query();
@@ -40,19 +43,14 @@ class TeamController extends Controller
 
             $teams = $query->orderBy('team_display_name')->get();
 
-            return response()->json([
+            return $this->successResponse([
                 'data' => $teams,
                 'meta' => [
                     'total' => $teams->count()
                 ]
-            ]);
+            ], 'Teams retrieved successfully');
         } catch (\Exception $e) {
-            return response()->json([
-                'data' => [],
-                'meta' => ['total' => 0],
-                'message' => 'Database is still being set up. Please try again in a few minutes.',
-                'error' => $e->getMessage()
-            ], 503);
+            return $this->handleException($e, 'Retrieving teams');
         }
     }
 
@@ -61,12 +59,10 @@ class TeamController extends Controller
         $team = WnbaTeam::where('team_id', $teamId)->first();
 
         if (!$team) {
-            return response()->json([
-                'error' => 'Team not found'
-            ], 404);
+            return $this->notFoundResponse('Team');
         }
 
-        return response()->json([
+        return $this->successResponse([
             'data' => $team
         ]);
     }

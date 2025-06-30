@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\ApiResponseTrait;
+use App\Http\Traits\CacheHelper;
 use App\Services\Odds\OddsApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -11,6 +13,9 @@ use Carbon\Carbon;
 
 class OddsController extends Controller
 {
+    use ApiResponseTrait, CacheHelper;
+    
+    protected string $cachePrefix = 'odds_api';
     private OddsApiService $oddsApi;
 
     public function __construct(OddsApiService $oddsApi)
@@ -26,21 +31,12 @@ class OddsController extends Controller
         try {
             $sports = $this->oddsApi->getSports();
 
-            return response()->json([
-                'success' => true,
+            return $this->successResponse([
                 'data' => $sports,
                 'count' => count($sports)
-            ]);
+            ], 'Sports retrieved successfully');
         } catch (\Exception $e) {
-            Log::error('Failed to get sports from Odds API', [
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch sports data',
-                'error' => $e->getMessage()
-            ], 500);
+            return $this->handleException($e, 'Fetching sports data from Odds API');
         }
     }
 
@@ -50,7 +46,7 @@ class OddsController extends Controller
     public function getWnbaOdds(Request $request)
     {
         try {
-            $validated = $request->validate([
+            $this->validateRequest($request->all(), [
                 'markets' => 'nullable|array',
                 'markets.*' => 'string|in:h2h,spreads,totals',
                 'bookmakers' => 'nullable|array',
@@ -58,6 +54,8 @@ class OddsController extends Controller
                 'region' => 'nullable|string|in:us,uk,eu,au',
                 'odds_format' => 'nullable|string|in:american,decimal,fractional'
             ]);
+            
+            $validated = $request->only(['markets', 'bookmakers', 'region', 'odds_format']);
 
             $markets = $validated['markets'] ?? ['h2h', 'spreads', 'totals'];
             $bookmakers = $validated['bookmakers'] ?? null;

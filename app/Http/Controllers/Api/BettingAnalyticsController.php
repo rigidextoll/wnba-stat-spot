@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\ApiResponseTrait;
+use App\Http\Traits\CacheHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -11,51 +13,37 @@ use Illuminate\Support\Facades\Cache;
 
 class BettingAnalyticsController extends Controller
 {
+    use ApiResponseTrait, CacheHelper;
+    
+    protected string $cachePrefix = 'betting_analytics';
     /**
      * Get comprehensive betting analytics
      */
     public function getAnalytics(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'timeframe' => 'nullable|string|in:7d,30d,90d,season',
-            'bet_type' => 'nullable|string|in:all,player_props,team_totals,spreads,moneylines'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
+        try {
+            $this->validateRequest($request->all(), [
+                'timeframe' => 'nullable|string|in:7d,30d,90d,season',
+                'bet_type' => 'nullable|string|in:all,player_props,team_totals,spreads,moneylines'
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->validationErrorResponse($e->errors());
         }
 
         try {
             $timeframe = $request->input('timeframe', '30d');
             $betType = $request->input('bet_type', 'all');
 
-            // Cache key for analytics data
-            $cacheKey = "betting_analytics_{$timeframe}_{$betType}";
-
-            $analytics = Cache::remember($cacheKey, 900, function () use ($timeframe, $betType) {
+            $cacheKey = "analytics_{$timeframe}_{$betType}";
+            
+            $analytics = $this->getCached($cacheKey, function () use ($timeframe, $betType) {
                 return $this->generateBettingAnalytics($timeframe, $betType);
-            });
+            }, 900);
 
-            return response()->json([
-                'success' => true,
-                'data' => $analytics
-            ]);
+            return $this->successResponse($analytics, 'Betting analytics retrieved successfully');
 
         } catch (\Exception $e) {
-            Log::error('Betting analytics failed', [
-                'timeframe' => $request->input('timeframe'),
-                'bet_type' => $request->input('bet_type'),
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve betting analytics',
-                'error' => $e->getMessage()
-            ], 500);
+            return $this->handleException($e, 'Retrieving betting analytics');
         }
     }
 

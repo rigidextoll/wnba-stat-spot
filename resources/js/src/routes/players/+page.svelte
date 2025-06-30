@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { api } from '$lib/api/client';
     import DefaultLayout from "$lib/layouts/DefaultLayout.svelte";
+    import LoadingError from '$lib/components/LoadingError.svelte';
 
     interface Player {
         id: number;
@@ -97,28 +98,19 @@
             </div>
         </div>
 
-        {#if loading}
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2 mb-0">Loading players...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {:else if error}
-            <div class="row">
-                <div class="col-12">
-                    <div class="alert alert-danger" role="alert">
-                        <strong>Error:</strong> {error}
-                    </div>
-                </div>
-            </div>
-        {:else if viewMode === 'table'}
+        <LoadingError 
+            {loading} 
+            {error} 
+            loadingText="Loading players..."
+            retryAction={() => {
+                loading = true;
+                error = null;
+                onMount();
+            }}
+        />
+        
+        {#if !loading && !error}
+            {#if viewMode === 'table'}
             <!-- Table View -->
             <div class="row">
                 <div class="col-12">
@@ -285,5 +277,6 @@
                 </div>
             {/if}
         {/if}
+    {/if}
     </div>
 </DefaultLayout>
