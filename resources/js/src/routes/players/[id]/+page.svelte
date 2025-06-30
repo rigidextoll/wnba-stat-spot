@@ -159,7 +159,7 @@
                         });
                     }
                 } catch (err) {
-                    console.warn(`Failed to get prediction for ${statType}:`, err);
+                    // Failed to get prediction, using fallback
                     // Add fallback data
                     predictions.push(generateFallbackPropBet(statType));
                 }
@@ -306,26 +306,24 @@
                 params.min_accuracy = testFilters.min_accuracy;
             }
 
-            console.log('🔍 Loading historical test results with params:', params);
-            console.log('🔍 Player object:', player);
-            console.log('🔍 PlayerId from route:', playerId);
+            // Loading historical test results with filtered parameters
 
             const response = await api.wnba.testing.getHistoricalResults(params);
 
-            console.log('🔍 Historical test response:', response);
+            // Processing historical test response
 
             if (response.success) {
                 // The API returns data in response.data.results, not response.data
                 historicalTestResults = response.data?.results || [];
-                console.log('🔍 Historical test results loaded:', historicalTestResults.length, 'results');
+                // Historical test results loaded successfully
             } else {
                 historicalTestError = 'Failed to load historical test results';
-                console.error('❌ API returned success=false:', response);
+                // API returned success=false
             }
 
         } catch (err) {
             historicalTestError = err instanceof Error ? err.message : 'Failed to load historical test results';
-            console.error('❌ Error loading historical test results:', err);
+            // Error loading historical test results
         } finally {
             historicalTestLoading = false;
         }

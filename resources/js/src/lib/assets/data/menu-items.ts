@@ -63,6 +63,12 @@ export const MENU_ITEMS: MenuItemType[] = [
         url: '/players',
     },
     {
+        key: 'compare-players',
+        icon: 'iconamoon:compare-duotone',
+        label: 'Compare Players',
+        url: '/compare/players',
+    },
+    {
         key: 'games',
         icon: 'iconamoon:game-duotone',
         label: 'Games',

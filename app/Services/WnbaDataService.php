@@ -14,13 +14,13 @@ use League\Csv\Reader;
 
 class WnbaDataService
 {
-    private const WNBA_BOX_SCORE_URL = 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_player_boxscores/player_box_2025.csv';
+    private const WNBA_BOX_SCORE_URL = env('WNBA_BOX_SCORE_URL', 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_player_boxscores/player_box_2025.csv');
 
-    private const WNBA_TEAM_URL = 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_team_boxscores/team_box_2025.csv';
+    private const WNBA_TEAM_URL = env('WNBA_TEAM_URL', 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_team_boxscores/team_box_2025.csv');
 
-    private const WNBA_PBP_URL = 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_pbp/play_by_play_2025.csv';
+    private const WNBA_PBP_URL = env('WNBA_PBP_URL', 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_pbp/play_by_play_2025.csv');
 
-    private const WNBA_TEAM_SCHEDULE_URL = 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_schedules/wnba_schedule_2025.csv';
+    private const WNBA_TEAM_SCHEDULE_URL = env('WNBA_TEAM_SCHEDULE_URL', 'https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_wnba_schedules/wnba_schedule_2025.csv');
 
     /**
      * Safely get a value from an array with an optional default

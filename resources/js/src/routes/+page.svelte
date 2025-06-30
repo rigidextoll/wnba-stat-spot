@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { api } from '$lib/api/client';
     import DefaultLayout from "$lib/layouts/DefaultLayout.svelte";
+    import PersonalizedDashboard from "$lib/components/PersonalizedDashboard.svelte";
     import TodaysBestProps from "$lib/components/TodaysBestProps.svelte";
 
     let dashboardData = {
@@ -46,11 +47,15 @@
 
 <DefaultLayout>
     <div class="container-xxl">
-        <div class="row">
+        <!-- Personalized Dashboard -->
+        <PersonalizedDashboard />
+
+        <!-- Original Dashboard (kept for reference) -->
+        <div class="row mt-5">
             <div class="col-12">
                 <div class="page-title-box">
-                    <h4 class="page-title">WNBA Stat Spot Dashboard</h4>
-                    <p class="text-muted mb-0">Your ultimate destination for WNBA statistics, analytics, and betting insights</p>
+                    <h4 class="page-title">Quick Links</h4>
+                    <p class="text-muted mb-0">Access all features and tools</p>
                 </div>
             </div>
         </div>

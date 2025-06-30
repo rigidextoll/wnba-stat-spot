@@ -1,12 +1,12 @@
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 
-// Development fallback URLs for Docker troubleshooting
+// Development fallback URLs - these should be set via environment variables in production
 const API_URLS = {
-    service: 'http://laravel.test:80/api',           // Container-to-container (recommended)
-    hostInternal: 'http://host.docker.internal:80/api', // Docker Desktop host access
-    localhost: 'http://localhost:80/api',            // Direct localhost
-    localhostDefault: 'http://localhost/api'         // Fallback
+    service: env.PUBLIC_API_URL_SERVICE || 'http://laravel.test:80/api',
+    hostInternal: env.PUBLIC_API_URL_HOST_INTERNAL || 'http://host.docker.internal:80/api',
+    localhost: env.PUBLIC_API_URL_LOCALHOST || 'http://localhost:80/api',
+    localhostDefault: env.PUBLIC_API_URL_DEFAULT || 'http://localhost/api'
 };
 
 // Get API URL from environment variables with fallbacks
@@ -63,20 +63,7 @@ export function getUserTimezone() {
     };
 }
 
-// Enhanced debug logging
-if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    console.log('🔧 API Client Debug Info:', {
-        browser,
-        selectedURL: API_URL,
-        envApiUrl: env.PUBLIC_API_URL,
-        currentURL: window.location.href,
-        currentHost: window.location.host,
-        environment: env.PUBLIC_API_URL ? 'production' : 'development',
-        isProduction: !window.location.host.includes('localhost'),
-        containerMode: 'docker-compose',
-        userAgent: navigator.userAgent
-    });
-}
+// API Client configuration complete
 
 export interface ApiResponse<T> {
     data: T;
@@ -650,12 +637,7 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit & { cacheTtl?
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-        if (import.meta.env.DEV) {
-            console.error('❌ API request failed:', {
-                url,
-                error: errorMessage
-            });
-        }
+        // API request failed - check network connection
 
         throw error;
     }

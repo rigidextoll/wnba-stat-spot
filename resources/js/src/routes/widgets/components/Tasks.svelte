@@ -2,16 +2,16 @@
     import {Button, Card, CardBody, CardHeader, CardTitle, FormGroup, Input} from "@sveltestrap/sveltestrap";
 
     const options = [
-        {text: 'Review system logs for any reported errors', value: '1'},
-        {text: 'Conduct user testing to identify potential bugs', value: '2'},
-        {text: 'Gather feedback from stakeholders', value: '3'},
-        {text: 'Prioritize bugs based on severity and impact', value: '4'},
-        {text: 'Investigate and analyze the root cause of each bug', value: '5'},
-        {text: 'Develop and implement fixes for the identified bugs', value: '6'},
-        {text: 'Complete any recurring tasks', value: '7'},
-        {text: 'Check emails and respond', value: '8'},
-        {text: 'Review schedule for the day', value: '9'},
-        {text: 'Daily stand-up meeting', value: '10'}
+        {text: 'Review WNBA game data import logs', value: '1'},
+        {text: 'Update player statistics from latest games', value: '2'},
+        {text: 'Validate prediction model accuracy', value: '3'},
+        {text: 'Check odds API connection status', value: '4'},
+        {text: 'Review team analytics dashboard', value: '5'},
+        {text: 'Update prop betting recommendations', value: '6'},
+        {text: 'Monitor data quality metrics', value: '7'},
+        {text: 'Generate weekly analytics reports', value: '8'},
+        {text: 'Review system performance metrics', value: '9'},
+        {text: 'Update player injury status', value: '10'}
     ]
 </script>
 
