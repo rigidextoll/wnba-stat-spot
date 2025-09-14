@@ -16,8 +16,6 @@ use Illuminate\Support\Facades\Schema;
 class TeamController extends Controller
 {
     use ApiResponseTrait, CacheHelper;
-    protected int $defaultCacheTtl = 7200; // 2 hours (teams change less frequently)
-    protected string $cachePrefix = 'wnba_teams';
 
     public function index(Request $request): JsonResponse
     {

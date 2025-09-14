@@ -55,11 +55,11 @@ services:
           type: redis
           name: wnba-redis
           property: port
-      - key: REDIS_PASSWORD
+      - key: REDIS_URL
         fromService:
           type: redis
           name: wnba-redis
-          property: password
+          property: connectionString
 
       # Laravel Configuration
       - key: CACHE_DRIVER
@@ -233,6 +233,9 @@ services:
     name: wnba-redis
     plan: starter # 25MB - upgrade as needed
     maxmemoryPolicy: allkeys-lru
+    ipAllowList:
+      - source: service
+        serviceName: wnba-stat-spot
 
 databases:
   # PostgreSQL Database

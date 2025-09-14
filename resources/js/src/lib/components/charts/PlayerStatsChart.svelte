@@ -10,7 +10,7 @@
     export let loading: boolean = false;
     export let error: string | null = null;
 
-    let baseChart: BaseChart;
+    let baseChart: InstanceType<typeof BaseChart>;
 
     // Transform data for Chart.js
     $: chartData = {
@@ -98,9 +98,9 @@
     bind:this={baseChart}
     title={statName ? `${statName} Trend` : 'Player Statistics'}
     chartType="line"
-    {data}={chartData}
+    data={chartData}
     options={chartOptions}
-    {height}
-    {loading}
-    {error}
+    height={height}
+    loading={loading}
+    error={error}
 />

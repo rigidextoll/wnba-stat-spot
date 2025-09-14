@@ -58,6 +58,16 @@ RUN apk add --no-cache \
 RUN ln -sf /usr/bin/php82 /usr/bin/php \
     && ln -sf /usr/sbin/php-fpm82 /usr/sbin/php-fpm
 
+# add defaults + export into env (works even if not passed at build time)
+ARG WWWGROUP=1000
+ARG WWWUSER=1337
+ENV WWWGROUP=${WWWGROUP}
+ENV WWWUSER=${WWWUSER}
+
+# create sail group/user with safe fallbacks (Alpine uses addgroup/adduser)
+RUN addgroup -g ${WWWGROUP:-1000} -S sail \
+    && adduser -S -D -H -u ${WWWUSER:-1337} -G sail sail
+
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
