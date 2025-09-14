@@ -233,8 +233,6 @@ services:
     name: wnba-redis
     plan: starter # 25MB - upgrade as needed
     maxmemoryPolicy: allkeys-lru
-    ipAllowList:
-      - cidrBlock: 0.0.0.0/0
 
 databases:
   # PostgreSQL Database
