@@ -234,8 +234,7 @@ services:
     plan: starter # 25MB - upgrade as needed
     maxmemoryPolicy: allkeys-lru
     ipAllowList:
-      - source: service
-        serviceName: wnba-stat-spot
+      - cidrBlock: 0.0.0.0/0
 
 databases:
   # PostgreSQL Database
