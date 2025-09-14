@@ -4,8 +4,10 @@ services:
     name: wnba-stat-spot
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: starter # You can upgrade to standard/pro as needed
     envVars:
+      - key: PORT
+        value: "80"
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
@@ -13,9 +15,12 @@ services:
       - key: APP_KEY
         generateValue: true
       - key: APP_URL
-        value: https://example.com  # set real domain after create
+        fromService:
+          type: web
+          name: wnba-stat-spot
+          property: host
 
-      # Database (PostgreSQL)
+      # Database Configuration (PostgreSQL)
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
@@ -39,7 +44,7 @@ services:
           name: wnba-stat-spot-db
           property: password
 
-      # Redis
+      # Redis Configuration
       - key: REDIS_HOST
         fromService:
           type: redis
@@ -56,7 +61,7 @@ services:
           name: wnba-redis
           property: connectionString
 
-      # Laravel
+      # Laravel Configuration
       - key: CACHE_DRIVER
         value: redis
       - key: QUEUE_CONNECTION
@@ -68,7 +73,7 @@ services:
       - key: FILESYSTEM_DISK
         value: local
 
-      # The Odds API (set key in dashboard)
+      # The Odds API Configuration (Set these in Render Dashboard)
       - key: THE_ODDS_API_KEY
         sync: false
       - key: THE_ODDS_API_BASE_URL
@@ -220,19 +225,20 @@ services:
       - key: WNBA_CALIBRATION_BINS
         value: "10"
 
+    # Health check for the web service
     healthCheckPath: /
 
-  # Redis Cache Service
-- type: redis
-  name: wnba-redis
-  plan: starter
-  maxmemoryPolicy: allkeys-lru
-  allowedIPs:
-    - 0.0.0.0/0
+  - type: redis
+    name: wnba-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList:
+      - cidr: 0.0.0.0/0
+        description: open
 
 databases:
   # PostgreSQL Database
   - name: wnba-stat-spot-db
     databaseName: wnba_stat_spot
     user: wnba_user
-    plan: starter
+    plan: starter # 1GB storage - upgrade as needed
