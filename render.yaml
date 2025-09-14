@@ -223,13 +223,12 @@ services:
     healthCheckPath: /
 
   # Redis Cache Service
-  - type: redis
-    name: wnba-redis
-    plan: starter
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList:
-      - cidr: 0.0.0.0/0
-        description: open
+- type: redis
+  name: wnba-redis
+  plan: starter
+  maxmemoryPolicy: allkeys-lru
+  allowedIPs:
+    - 0.0.0.0/0
 
 databases:
   # PostgreSQL Database
