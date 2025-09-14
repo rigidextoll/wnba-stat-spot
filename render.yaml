@@ -228,8 +228,8 @@ services:
     plan: starter
     maxmemoryPolicy: allkeys-lru
     ipAllowList:
-  - cidr: 0.0.0.0/0
-    description: open
+      - cidr: 0.0.0.0/0
+        description: open
 
 databases:
   # PostgreSQL Database
