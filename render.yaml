@@ -477,11 +477,3 @@ databases:
     databaseName: wnba_stat_spot
     user: wnba_user
     plan: starter # 1GB storage - upgrade as needed
-
-
-databases:
-  # PostgreSQL Database
-  - name: wnba-stat-spot-db
-    databaseName: wnba_stat_spot
-    user: wnba_user
-    plan: starter # 1GB storage - upgrade as needed
